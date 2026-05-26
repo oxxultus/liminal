@@ -53,7 +53,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 필터링된 커맨드 목록
   const filteredCommands = SLASH_COMMANDS.filter(c =>
     c.command.includes(slashFilter.toLowerCase())
   );
@@ -113,7 +112,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 슬래시 메뉴 외부 클릭 시 닫기
   useEffect(() => {
     const handleClick = () => setShowSlashMenu(false);
     if (showSlashMenu) document.addEventListener('click', handleClick);
@@ -132,7 +130,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     onTitleUpdate(sessionId, title);
   };
 
-  // ── 슬래시 커맨드 실행 ──
   const executeSlashCommand = async (command: string) => {
     setInput('');
     setShowSlashMenu(false);
@@ -215,7 +212,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
-  // ── 입력 변경 핸들러 ──
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInput(val);
@@ -233,7 +229,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
-  // ── 키보드 핸들러 ──
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (showSlashMenu && filteredCommands.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -269,7 +264,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
-  // ── 요약 압축 ──
   const compressWithSummary = async (history: any[]): Promise<any[]> => {
     const toSummarize = history.slice(0, history.length - KEEP_RECENT);
     const recent = history.slice(-KEEP_RECENT);
@@ -314,7 +308,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
-  // ── 메시지 전송 및 MCP 통합 실행 로직 (복구 완료) ──
+  // ── 💡 [대폭 개조] 비동기 제어권 위임 및 완벽 보장형 전송 함수 ──
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     if (input.startsWith('/')) {
@@ -331,18 +325,18 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
 
     setMessages(prev => [...prev, { id: generateId(), sender: 'user', text: userText }]);
     setInput('');
-    setLoading(true);
-
-    await saveMessage('user', userText);
-    if (isFirstUserMessage) await updateSessionTitle(userText);
-
-    let updatedHistory = [...apiConversation, { role: 'user', content: userText }];
-    if (apiConversation.length >= SUMMARY_TRIGGER) {
-      updatedHistory = await compressWithSummary(updatedHistory);
-    }
+    setLoading(true); // 💡 점 세 개 가동 시작
 
     try {
-      // 🔌 MCP 도구 스펙 추출 유틸 가동
+      await saveMessage('user', userText);
+      if (isFirstUserMessage) await updateSessionTitle(userText);
+
+      let updatedHistory = [...apiConversation, { role: 'user', content: userText }];
+      if (apiConversation.length >= SUMMARY_TRIGGER) {
+        updatedHistory = await compressWithSummary(updatedHistory);
+      }
+
+      // 🔌 1. 고정 정적 도구 명세 수집 및 주입
       const rawTools: any[] = await window.electronAPI.getMcpTools();
       const toolsByProvider: Record<string, any[]> = {
         anthropic: rawTools.map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
@@ -351,80 +345,39 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
       };
       const tools = toolsByProvider[activeEngine.provider] ?? [];
 
+      // 🔌 2. 메인 백엔드 무한루프 프록시 엔진 가동
+      // 이제 백엔드가 모든 크롤링과 요약 처리를 한 번에 완료하여 최종 답변을 내려줍니다.
       const proxyRes = await window.electronAPI.sendChat({
-        engine: activeEngine, messages: updatedHistory,
+        engine: activeEngine, 
+        messages: updatedHistory,
         apiKey: activeEngine.apiKey,
         tools: tools.length > 0 ? tools : undefined,
       });
+
       if (!proxyRes.success) throw new Error(proxyRes.error);
 
-      const data = proxyRes.data;
-      let botResponseText = '';
-      let requestedTools: Array<{ id: string; name: string; args: Record<string, any> }> = [];
-
-      if (activeEngine.provider === 'anthropic' && data.rawContent) {
-        for (const block of data.rawContent) {
-          if (block.type === 'text') botResponseText += block.text;
-          if (block.type === 'tool_use') requestedTools.push({ id: block.id, name: block.name, args: block.input });
-        }
-        updatedHistory.push({ role: 'assistant', content: data.rawContent });
-      } else if (activeEngine.provider === 'openai' && data.rawMessage) {
-        botResponseText = data.rawMessage.content || '';
-        updatedHistory.push(data.rawMessage);
-        if (data.rawMessage.tool_calls) {
-          requestedTools = data.rawMessage.tool_calls.map((tc: any) => ({
-            id: tc.id, name: tc.function.name, args: JSON.parse(tc.function.arguments),
-          }));
-        }
-      } else {
-        botResponseText = data.text || '';
-        updatedHistory.push({ role: 'assistant', content: botResponseText });
-      }
-
-      if (requestedTools.length === 0) {
-        if (botResponseText) {
-          setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: botResponseText }]);
-          await saveMessage('assistant', botResponseText);
-        }
-        setApiConversation(updatedHistory);
-        return;
-      }
-
-      // 🛠️ 대형 모델의 MCP 도구 콜 동적 라우팅 및 가로채기 파트
-      const claudeResultBlocks: any[] = [];
-      for (const tool of requestedTools) {
-        setMessages(prev => [...prev, { id: generateId(), sender: 'system', text: `⚙️ [MCP SYSTEM] 실행 중 -> ${tool.name}` }]);
-        const execRes = await window.electronAPI.executeMcpTool(tool.name, tool.args);
-        const resultText = execRes.success
-          ? execRes.result?.content?.map((c: any) => c.text).join('\n') ?? JSON.stringify(execRes.result)
-          : `❌ 실패: ${execRes.error}`;
+      // 🔌 3. 최종 완성된 텍스트 결과물을 화면에 반영 및 메모리 저장
+      const botResponseText = proxyRes.data?.text || '';
+      if (botResponseText) {
+        setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: botResponseText }]);
+        await saveMessage('assistant', botResponseText);
         
-        if (!execRes.success) setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: resultText }]);
-        if (activeEngine.provider === 'openai') {
-          updatedHistory.push({ role: 'tool', tool_call_id: tool.id, content: resultText });
-        } else if (activeEngine.provider === 'anthropic') {
-          claudeResultBlocks.push({ type: 'tool_result', tool_use_id: tool.id, content: resultText, is_error: !execRes.success });
+        // 다음 턴 대화를 위해 히스토리에 최종 축적 결과 동기화
+        if (activeEngine.provider === 'openai' && proxyRes.data.rawMessage) {
+          updatedHistory.push(proxyRes.data.rawMessage);
+        } else {
+          updatedHistory.push({ role: 'assistant', content: botResponseText });
         }
-      }
-      if (activeEngine.provider === 'anthropic' && claudeResultBlocks.length > 0) {
-        updatedHistory.push({ role: 'user', content: claudeResultBlocks });
-      }
-
-      const finalRes = await window.electronAPI.sendChat({
-        engine: activeEngine, messages: updatedHistory, apiKey: activeEngine.apiKey,
-      });
-      if (!finalRes.success) throw new Error(finalRes.error);
-      const finalText = finalRes.data.text || '';
-      if (finalText) {
-        setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: finalText }]);
-        await saveMessage('assistant', finalText);
-        updatedHistory.push({ role: 'assistant', content: finalText });
       }
       setApiConversation(updatedHistory);
 
     } catch (error: any) {
+      console.error("Renderer Chat Error:", error);
       setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: `❌ 에러: ${error.message}` }]);
-    } window.electronAPI.getMcpTools().catch(() => []).finally(() => setLoading(false));
+    } finally {
+      // 💡 [무한 대기 격파 핵심] 성공, 실패 여부 상관없이 마무리에 도달하면 무조건 점 세개 로딩을 끕니다.
+      setLoading(false);
+    }
   };
 
   return (
@@ -454,15 +407,12 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
               
               return (
                 <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
-                  
-                  {/* 발신자 태그: AI 엔진 이름만 노출 (유저 닉네임 제거 UX 반영) */}
                   {!isUser && (
                     <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#4E4E5A', padding: '0 4px', marginBottom: '2px', letterSpacing: '0.02em' }}>
                       {activeEngine?.name}
                     </span>
                   )}
                   
-                  {/* 말풍선 버블 선명화 스펙 */}
                   <div style={{ 
                     padding: '13px 18px', 
                     borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px', 
@@ -506,7 +456,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
       <div style={{ padding: '16px 20px 30px 20px', display: 'flex', justifyContent: 'center', position: 'relative' }}>
         <div style={{ width: '100%', maxWidth: '720px', position: 'relative' }}>
 
-          {/* 슬래시 커맨드 팝업 메뉴 (가독성 상향 스펙) */}
+          {/* 슬래시 커맨드 팝업 메뉴 */}
           {showSlashMenu && filteredCommands.length > 0 && (
             <div
               onClick={e => e.stopPropagation()}

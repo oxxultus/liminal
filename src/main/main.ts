@@ -1,12 +1,14 @@
 // src/main/main.ts
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'; 
 import * as path from 'path';
-import * as fs from 'fs'; 
+import axios from 'axios';
+import * as fs from 'fs';                  
+import * as fsPromises from 'fs/promises'; 
 import { McpPluginManager } from './mcp/pluginManager';
-import { initDb } from './db'; // 비동기 초기화 함수로 변경
+import { initDb } from './db';
 
 let mainWindow: BrowserWindow | null = null;
-let db: any; // DB 객체
+let db: any; 
 let pluginManager: McpPluginManager;
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -25,25 +27,29 @@ function createWindow() {
 }
 
 function registerIpcHandlers() {
-  ipcMain.handle('mcp:get-tools', async () => await pluginManager.getAllToolsForLlm());
+  ipcMain.handle('mcp:get-tools', async () => await pluginManager.getAllToolsForLlm(''));
   ipcMain.handle('get-mcp-plugins-list', async () => await pluginManager.getPluginsConfigList());
+  
   ipcMain.handle('remove-mcp-plugin', async (_, pluginId: string) => {
     try { await pluginManager.removePlugin(pluginId); return { success: true }; }
     catch (error: any) { return { success: false, error: error.message }; }
   });
+  
   ipcMain.handle('mcp:add-plugin', async (_event, config) => {
     try { const tools = await pluginManager.registerNewPlugin(config); return { success: true, tools }; }
     catch (error: any) { return { success: false, error: error.message }; }
   });
+  
   ipcMain.handle('mcp:execute-tool', async (_event, { toolName, args }) => {
-    try { const result = await pluginManager.routeCallTool(toolName, args); return { success: true, result }; }
+    try { 
+      const result = await pluginManager.routeCallTool(toolName, args, mainWindow!); 
+      return { success: true, result }; 
+    }
     catch (error: any) { return { success: false, error: error.message }; }
   });
 
-  // 1. 엔진 리스트 가져오기 (비동기 DB)
   ipcMain.handle('llm:get-engines', async () => await db.all('SELECT * FROM engines'));
 
-  // 2. 엔진 추가
   ipcMain.handle('llm:add-engine', async (_, engine) => {
     try {
       await db.run(
@@ -54,78 +60,167 @@ function registerIpcHandlers() {
     } catch (e: any) { return { success: false, error: e.message }; }
   });
 
-  // 3. 엔진 삭제
   ipcMain.handle('llm:remove-engine', async (_, id) => {
     try { await db.run('DELETE FROM engines WHERE id = ?', [id]); return { success: true }; }
     catch (e: any) { return { success: false, error: e.message }; }
   });
 
-  // 4. 통합 프록시 라우터
-  ipcMain.handle('llm:chat-proxy', async (_, { engine, messages, apiKey, tools }) => {
-    try {
-      let headers: any = { 'Content-Type': 'application/json' };
+  // =========================================================================
+  // 💡 [핵심 리팩토링] 연쇄적 도구 호출(Multi-Tool Calling) 지원 무한 루프 프록시 엔진
+  // =========================================================================
+  ipcMain.handle('llm:chat-proxy', async (_, { engine, messages, apiKey, tools: staticTools }) => {
+  try {
+    let currentMessages = [...messages];
+    let headers: any = { 'Content-Type': 'application/json' };
+    let url = engine.url;
+
+    if (engine.provider === 'openai') {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else if (engine.provider === 'anthropic') {
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    } else if (engine.provider === 'google') {
+      url = `${engine.url}?key=${apiKey}`;
+    }
+
+    // 오케스트레이션 무한 루프 가동
+    while (true) {
       let body: any = { model: engine.model };
-      let url = engine.url;
 
-      if (engine.provider === 'anthropic') {
-        headers['x-api-key'] = apiKey;
-        headers['anthropic-version'] = '2023-06-01';
-        body.messages = messages;
-        body.max_tokens = 1024;
-        if (tools && tools.length > 0) body.tools = tools;
+      // 동적 문맥 필터링 툴셋 추출
+      const lastMessage = currentMessages[currentMessages.length - 1];
+      let textPrompt = '';
+      if (lastMessage && lastMessage.content) {
+        textPrompt = Array.isArray(lastMessage.content)
+          ? lastMessage.content.map((c: any) => c.text || '').join(' ')
+          : String(lastMessage.content);
+      }
+      const dynamicTools = await pluginManager.getAllToolsForLlm(textPrompt);
 
-      } else if (engine.provider === 'openai') {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-        body.messages = messages;
-        if (tools && tools.length > 0) body.tools = tools;
-
+      // 프로바이더별 바디 조립
+      if (engine.provider === 'openai') {
+        body.messages = currentMessages;
+        if (dynamicTools && dynamicTools.length > 0) body.tools = dynamicTools;
+      } else if (engine.provider === 'anthropic') {
+        body.messages = currentMessages;
+        body.max_tokens = 2048; // 대량 텍스트 분석을 위해 마진 확대
+        if (dynamicTools && dynamicTools.length > 0) {
+          body.tools = dynamicTools.map((t: any) => ({
+            name: t.name,
+            description: t.description,
+            input_schema: t.input_schema
+          }));
+        }
       } else if (engine.provider === 'google') {
-        url = `${engine.url}?key=${apiKey}`;
-        body.contents = messages.map((m: any) => ({
+        body.contents = currentMessages.map((m: any) => ({
           role: m.role === 'assistant' ? 'model' : 'user',
-          parts: Array.isArray(m.content)
-            ? m.content  // tool_result 배열 그대로
-            : [{ text: m.content }],
+          parts: Array.isArray(m.content) ? m.content : [{ text: String(m.content) }],
         }));
-        if (tools && tools.length > 0) body.tools = tools;
       }
 
+      // HTTP 통신 실행
       const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
       const rawData = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(rawData));
 
-      // provider별 응답 파싱 - rawContent/rawMessage를 함께 반환해 프론트가 도구 호출 여부를 판단
-      if (engine.provider === 'anthropic') {
-        const textBlock = rawData.content?.find((b: any) => b.type === 'text');
-        return {
-          success: true,
-          data: {
-            text: textBlock?.text ?? '',
-            rawContent: rawData.content, // tool_use 블록 포함한 원본 배열
-          },
-        };
+      // ---------------------------------------------------------------------
+      // 분기 1. OpenAI 프로바이더 제어 루프
+      // ---------------------------------------------------------------------
+      if (engine.provider === 'openai') {
+        const assistantMessage = rawData.choices[0].message;
 
-      } else if (engine.provider === 'openai') {
-        const message = rawData.choices[0].message;
-        return {
-          success: true,
-          data: {
-            text: message.content ?? '',
-            rawMessage: message, // tool_calls 포함한 원본 메시지
-          },
-        };
+        if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
+          return { success: true, data: { text: assistantMessage.content || '', rawMessage: assistantMessage } };
+        }
 
-      } else if (engine.provider === 'google') {
-        const text = rawData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-        return { success: true, data: { text } };
+        currentMessages.push(assistantMessage);
+
+        for (const toolCall of assistantMessage.tool_calls) {
+          const toolName = toolCall.function.name;
+          const toolArgs = JSON.parse(toolCall.function.arguments);
+
+          console.log(`⚙️ [MCP 루프] OpenAI 도구 가동: ${toolName}`);
+          const toolResult = await pluginManager.routeCallTool(toolName, toolArgs, mainWindow!);
+
+          currentMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolName,
+            content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)
+          });
+        }
+        continue; 
       }
 
-      return { success: false, error: '지원하지 않는 provider' };
+      // ---------------------------------------------------------------------
+      // 분기 2. Anthropic Claude 프로바이더 제어 루프 (버그 수정 완비)
+      // ---------------------------------------------------------------------
+      if (engine.provider === 'anthropic') {
+        // 도구 사용 플래그 분석
+        const isToolUse = rawData.stop_reason === 'tool_use' || rawData.content?.some((b: any) => b.type === 'tool_use');
 
-    } catch (error: any) {
-      return { success: false, error: error.message };
+        // 💡 [최종 텍스트 완료 분기] 더 이상 도구 호출이 없다면 렌더러 호환 규격으로 포매팅하여 즉시 탈출!
+        if (!isToolUse) {
+          const textBlock = rawData.content?.find((b: any) => b.type === 'text');
+          const finalReplyText = textBlock?.text ?? '';
+          
+          return { 
+            success: true, 
+            data: { 
+              text: finalReplyText, 
+              // 프론트엔드가 OpenAI 규격의 .content 를 안전하게 파싱할 수 있도록 가상 메타 매핑 제공
+              rawMessage: { role: 'assistant', content: finalReplyText } 
+            } 
+          };
+        }
+
+        // 도구 실행 단계 진입: 클로드의 의사를 히스토리에 먼저 주입
+        currentMessages.push({ role: 'assistant', content: rawData.content });
+
+        const toolRequests = rawData.content.filter((b: any) => b.type === 'tool_use');
+        const toolResultsBlocks: any[] = [];
+
+        for (const req of toolRequests) {
+          console.log(`⚙️ [MCP 루프] Claude 도구 가동: ${req.name}`);
+          const toolResult = await pluginManager.routeCallTool(req.name, req.input, mainWindow!);
+
+          // 툴 응답 결과물 텍스트 가공 처리
+          let resultText = '';
+          if (toolResult && toolResult.content && toolResult.content[0]) {
+            resultText = toolResult.content[0].text || JSON.stringify(toolResult);
+          } else {
+            resultText = JSON.stringify(toolResult);
+          }
+
+          toolResultsBlocks.push({
+            type: 'tool_result',
+            tool_use_id: req.id,
+            content: resultText
+          });
+        }
+
+        // 대화 히스토리에 툴 실행 결과 보고서 합체 후 루프 리로드
+        currentMessages.push({ role: 'user', content: toolResultsBlocks });
+        continue; 
+      }
+
+      // ---------------------------------------------------------------------
+      // 분기 3. Google Gemini 프로바이더 처리
+      // ---------------------------------------------------------------------
+      if (engine.provider === 'google') {
+        const text = rawData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        return { success: true, data: { text, rawMessage: { role: 'assistant', content: text } } };
+      }
+
+      break;
     }
-  });
+
+    return { success: false, error: '지원하지 않는 provider 구조체 체인 오류' };
+  } catch (error: any) {
+    console.error("🚨 Proxy Error:", error);
+    return { success: false, error: error.message };
+  }
+});
 
   // --- 세션 관련 ---
   ipcMain.handle('chat:get-sessions', async () => {
@@ -155,7 +250,6 @@ function registerIpcHandlers() {
       'INSERT INTO messages (id, sessionId, role, content, timestamp) VALUES (?, ?, ?, ?, ?)',
       [id, sessionId, role, content, Date.now()]
     );
-    // 세션의 업데이트 시간 갱신
     await db.run('UPDATE chat_sessions SET updatedAt = ? WHERE id = ?', [Date.now(), sessionId]);
     return { success: true };
   });
@@ -165,20 +259,13 @@ function registerIpcHandlers() {
     return { success: true };
   });
 
-  // 세션 요약 조회
   ipcMain.handle('summary:get', async (_, sessionId: string) => {
     try {
-      const row = await db.get(
-        'SELECT * FROM session_summaries WHERE sessionId = ?',
-        [sessionId]
-      );
+      const row = await db.get('SELECT * FROM session_summaries WHERE sessionId = ?', [sessionId]);
       return row ?? null;
-    } catch (e: any) {
-      return null;
-    }
+    } catch (e: any) { return null; }
   });
   
-  // 세션 요약 저장 (UPSERT - sessionId 당 1개 유지)
   ipcMain.handle('summary:save', async (_, { id, sessionId, summary, coveredUpTo }) => {
     try {
       await db.run(
@@ -191,11 +278,84 @@ function registerIpcHandlers() {
         [id, sessionId, summary, coveredUpTo, Date.now()]
       );
       return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
+    } catch (e: any) { return { success: false, error: e.message }; }
   });
 
+  ipcMain.handle('mcp:download-plugin', async (_, { downloadUrl, aliasName, workspaceDir, keywords }) => {
+    try {
+      const pluginsDir = path.join(app.getPath('userData'), 'external_plugins');
+      await fsPromises.mkdir(pluginsDir, { recursive: true });
+
+      const response = await axios.get(downloadUrl, { responseType: 'text' });
+      const pluginCode = response.data;
+
+      const pluginId = `custom-${Date.now()}`;
+      const filename = `${pluginId}.js`;
+      const targetFilePath = path.join(pluginsDir, filename);
+      await fsPromises.writeFile(targetFilePath, pluginCode, 'utf-8');
+
+      const keywordsStr = Array.isArray(keywords) ? keywords.join(',') : '';
+
+      await db.run(
+        `INSERT INTO mcp_plugins (id, type, name, url, apiKey, workspaceDir, keywords, enabled) 
+        VALUES (?, 'custom', ?, ?, NULL, ?, ?, 1)`,
+        [pluginId, aliasName, targetFilePath, workspaceDir, keywordsStr]
+      );
+
+      await pluginManager.registerNewPlugin({
+        id: pluginId,
+        type: 'custom', 
+        name: aliasName,
+        url: targetFilePath,
+        workspaceDir: workspaceDir,
+        keywords: keywords,
+        enabled: true
+      } as any);
+
+      return { success: true, message: '플러그인 설치 및 워킹 디렉토리 매핑 완료' };
+    } catch (error: any) { return { success: false, error: error.message }; }
+  });
+  
+  ipcMain.handle('mcp:open-file-dialog', async () => {
+    if (!mainWindow) return { canceled: true, filePaths: [] };
+    return await dialog.showOpenDialog(mainWindow, {
+      title: 'MCP 플러그인 JavaScript 스크립트 파일 선택',
+      filters: [{ name: 'JavaScript Files', extensions: ['js'] }],
+      properties: ['openFile']
+    });
+  });
+
+  ipcMain.handle('mcp:upload-plugin', async (_, { sourceFilePath, aliasName, keywords }) => {
+    try {
+      const pluginsDir = path.join(app.getPath('userData'), 'external_plugins');
+      await fsPromises.mkdir(pluginsDir, { recursive: true });
+
+      const pluginId = `custom-${Date.now()}`;
+      const filename = `${pluginId}.js`;
+      const targetFilePath = path.join(pluginsDir, filename);
+      
+      await fsPromises.copyFile(sourceFilePath, targetFilePath);
+
+      const keywordsStr = Array.isArray(keywords) ? keywords.join(',') : '';
+
+      await db.run(
+        `INSERT INTO mcp_plugins (id, type, name, url, workspaceDir, keywords, enabled) 
+         VALUES (?, 'custom', ?, ?, NULL, ?, 1)`,
+         [pluginId, aliasName, targetFilePath, keywordsStr]
+      );
+
+      await pluginManager.registerNewPlugin({
+        id: pluginId,
+        type: 'custom',
+        name: aliasName,
+        url: targetFilePath,
+        keywords: keywords,
+        enabled: true
+      } as any);
+
+      return { success: true, message: '로컬 플러그인 업로드 및 마운트 완료' };
+    } catch (error: any) { return { success: false, error: error.message }; }
+  });
 }
 
 const migrateEngines = async () => {
@@ -214,7 +374,7 @@ const migrateEngines = async () => {
 };
 
 app.whenReady().then(async () => {
-  db = await initDb(); // DB 초기화
+  db = await initDb(); 
   await migrateEngines();
   pluginManager = new McpPluginManager(db);
   await pluginManager.loadPlugins();

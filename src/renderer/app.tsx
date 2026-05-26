@@ -325,7 +325,7 @@ export default function App() {
             fontSize: '0.82rem', fontWeight: 600, color: '#6E6E7A',
             pointerEvents: 'none', whiteSpace: 'nowrap',
           }}>
-            AI 사랑해 Client
+            Liminal Desktop
           </div>
         </div>
 

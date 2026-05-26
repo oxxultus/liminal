@@ -33,4 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateChatSessionTitle: (args: { sessionId: string; title: string }) => ipcRenderer.invoke('chat:update-session-title', args),
   getSummary: (sessionId: string) => ipcRenderer.invoke('summary:get', sessionId),
   saveSummary: (args: any) => ipcRenderer.invoke('summary:save', args),
+
+  openFileDialog: () => ipcRenderer.invoke('mcp:open-file-dialog'),
+  uploadPlugin: (payload: any) => ipcRenderer.invoke('mcp:upload-plugin', payload),
 });

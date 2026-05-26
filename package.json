@@ -23,6 +23,9 @@
     "openai": "^6.39.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "remark-gfm": "^4.0.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^6.0.1"
   },

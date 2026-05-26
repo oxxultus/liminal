@@ -3,7 +3,7 @@
 export interface McpTool {
   name: string;
   description: string;
-  inputSchema: Record<string, any>; // JSON Schema 형태
+  inputSchema: Record<string, any>;
 }
 
 export interface McpToolResult {
@@ -18,13 +18,13 @@ export interface McpPlugin {
   callTool(name: string, args: Record<string, any>): Promise<McpToolResult>;
 }
 
-// 사용자가 설정창에서 입력하고 디스크에 저장할 플러그인 설정 정보
 export interface PluginConfig {
   id: string;
-  type: 'remote' | 'local';
+  type: 'remote' | 'custom'; // 💡 'local'을 완벽히 도려내어 파이프라인 단순화
   name: string;
   url?: string;
   apiKey?: string;
   workspaceDir?: string;
   enabled: boolean;
+  keywords?: string[]; // 💡 [신규] 해당 플러그인을 트리거할 연관 키워드 목록
 }

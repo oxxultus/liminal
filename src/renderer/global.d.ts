@@ -6,6 +6,11 @@ export interface IElectronAPI {
   executeMcpTool: (toolName: string, args: any) => Promise<{ success: boolean; result?: any; error?: string }>;
   getMcpPluginsList: () => Promise<any[]>;
   removeMcpPlugin: (pluginId: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // 💡 [신규] 외부 무선 확장 및 로컬 업로드 스펙 타입 바인딩 완료
+  downloadPlugin: (payload: { downloadUrl: string; aliasName: string }) => Promise<{ success: boolean; message?: string; error?: string }>;
+  openFileDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>;
+  uploadPlugin: (payload: { sourceFilePath: string; aliasName: string }) => Promise<{ success: boolean; message?: string; error?: string }>;
 
   // --- 엔진 관리 브릿지 ---
   getEngines: () => Promise<any[]>;
