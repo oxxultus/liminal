@@ -7,57 +7,78 @@ export class RemoteHttpMcpPlugin implements McpPlugin {
   id: string;
   name: string;
   enabled: boolean;
-  private baseUrl: string;
-  private apiKey: string;
+  
+  // 💡 타입 호환성 및 Manager 편의를 위한 명시적 필드 선언
+  public url: string; 
+  public apiKey: string;
+  public filePath?: string = undefined;     // 원격 타입이므로 없음
+  public workspaceDir?: string = undefined; // 원격 타입이므로 없음
 
   constructor(id: string, name: string, url: string, apiKey: string) {
     this.id = id;
     this.name = name;
-    this.baseUrl = url;
+    this.url = url;
     this.apiKey = apiKey;
     this.enabled = true;
   }
 
-  // 라즈베리파이 FastAPI의 /api/v1/tools 에서 도구 명세를 가져와 네임스페이스를 바인딩합니다.
+  // 원격 서버(FastAPI 등)의 /api/v1/tools 에서 도구 명세를 가져와 네임스페이스를 바인딩합니다.
   async listTools(): Promise<McpTool[]> {
     try {
-      const response = await axios.get(`${this.baseUrl}/api/v1/tools`, {
+      const response = await axios.get(`${this.url}/api/v1/tools`, {
         headers: { 'X-API-KEY': this.apiKey },
-        timeout: 3000 // 3초 내에 응답 없으면 타임아웃
+        timeout: 5000 // 연결 컨텍스트를 고려해 5초로 약간 여유를 둡니다.
       });
 
+      const tools = response.data?.tools ?? [];
+
       // 도구 명세 규격 호환 및 네임스페이스 주입
-      return response.data.tools.map((tool: any) => ({
+      return tools.map((tool: any) => ({
         name: `${this.id}__${tool.name}`,
-        description: tool.description,
-        inputSchema: tool.inputSchema || tool.parameters // MCP 스펙(inputSchema)과 OpenAI 스펙 보정
+        description: tool.description ?? '',
+        // 💡 백엔드 규격 불일치 방어 및 Fallback 오브젝트 주입
+        inputSchema: tool.inputSchema || tool.parameters || { type: 'object', properties: {} }
       }));
-    } catch (error) {
-      console.error(`[${this.name}] 원격 도구 목록 가져오기 실패:`, error);
+    } catch (error: any) {
+      console.error(`[${this.name}] 원격 도구 목록 가져오기 실패:`, error.message);
       return [];
     }
   }
 
-  // LLM이 호출한 도구 명령을 라즈베리파이로 전달합니다.
+  // LLM이 호출한 도구 명령을 원격 서버로 전달합니다.
   async callTool(name: string, args: Record<string, any>): Promise<McpToolResult> {
-    // 호출된 이름에서 접두사를 제거해 원래 이름 복원 (예: raspi1__set_temperature -> set_temperature)
-    const originalName = name.replace(`${this.id}__`, '');
+    // 💡 StdioMcpPlugin과 동일한 방식으로 안전하게 네임스페이스 접두사 제거
+    const prefix = `${this.id}__`;
+    const originalName = name.startsWith(prefix) ? name.slice(prefix.length) : name;
 
     try {
-      const response = await axios.post(`${this.baseUrl}/api/v1/tools/execute`, {
+      const response = await axios.post(`${this.url}/api/v1/tools/execute`, {
         name: originalName,
         arguments: args
       }, {
         headers: { 
           'Content-Type': 'application/json',
           'X-API-KEY': this.apiKey 
-        }
+        },
+        timeout: 15000 // 실행 대기 시간은 Stdio와 맞춰서 15초 제공
       });
 
       return response.data;
     } catch (error: any) {
+      console.error(`[${this.name}] callTool 원격 전송 오류:`, error.message);
+
+      // 💡 원격 서버(FastAPI 등)에서 보낸 세부 에러 바디가 있다면 추출하여 AI에 전달
+      let serverErrorMessage = error.message;
+      if (error.response?.data?.detail) {
+        serverErrorMessage = typeof error.response.data.detail === 'string'
+          ? error.response.data.detail
+          : JSON.stringify(error.response.data.detail);
+      } else if (error.response?.data?.message) {
+        serverErrorMessage = error.response.data.message;
+      }
+
       return {
-        content: [{ type: 'text', text: `❌ 원격 제어 실패 (${this.name}): ${error.message}` }]
+        content: [{ type: 'text', text: `❌ 원격 제어 실패 (${this.name}): ${serverErrorMessage}` }]
       };
     }
   }

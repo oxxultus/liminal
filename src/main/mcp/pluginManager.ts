@@ -148,12 +148,13 @@ export class McpPluginManager {
 
       const config = configs.find(c => c.id === plugin.id);
       
-      // DB에 저장된 키워드
+      // DB에 저장된 사용자의 커스텀 오버라이딩 키워드
       const dbKeywords = config?.keywords || [];
       
-      // 스크립트 내부 키워드 (향후 확장용)
-      const scriptKeywords = (plugin as any).pluginModule?.keywords || [];
+      // 💡 [수정 완료] mjs 파일 내부가 도구 목록(tools/list)을 반환할 때 함께 응답했던 고유 키워드 배열을 매핑
+      const scriptKeywords = (plugin as any).scriptKeywords || [];
 
+      // DB 저장 키워드와 파일 내장 키워드를 결합하여 중복 제거
       const finalKeywords = Array.from(new Set([...dbKeywords, ...scriptKeywords]));
 
       let isMatched = false;

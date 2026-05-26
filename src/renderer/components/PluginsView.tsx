@@ -54,6 +54,9 @@ export default function PluginsView() {
   const [apiKey, setApiKey] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
   const [customScriptPath, setCustomScriptPath] = useState('');
+  
+  // 💡 작업 경로 선택 지정 스위치 및 경로 명세 상태
+  const [useWorkspace, setUseWorkspace] = useState(true);
   const [pluginWorkspaceDir, setPluginWorkspaceDir] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   
@@ -122,7 +125,7 @@ export default function PluginsView() {
       name: name.trim(),
       url: targetPlugin.url || targetPlugin.scriptPath,
       apiKey: targetPlugin.apiKey,
-      workspaceDir: targetPlugin.workspaceDir,
+      workspaceDir: targetPlugin.workspaceDir, // 기존 유지 혹은 비어있음 유지
       keywords: parsedKeywords,
       enabled: true
     };
@@ -147,18 +150,40 @@ export default function PluginsView() {
       ? keywordsInput.split(',').map(k => k.trim()).filter(Boolean)
       : [];
 
+    // 체크박스가 꺼져있다면 공백 문자열 처리하여 백엔드가 undefined로 변환하게 함
+    const finalWorkspaceDir = useWorkspace ? pluginWorkspaceDir.trim() : '';
+
     if (pluginType === 'custom') {
-      if (!downloadUrl || !name || !pluginWorkspaceDir) { setStatusMsg('오류: 모든 값을 기입해 주세요.'); return; }
+      if (!downloadUrl || !name || (useWorkspace && !finalWorkspaceDir)) { 
+        setStatusMsg('오류: 모든 필수 값을 기입해 주세요.'); 
+        return; 
+      }
       try {
-        const res = await window.electronAPI.downloadPlugin({ downloadUrl, aliasName: name, workspaceDir: pluginWorkspaceDir, keywords: parsedKeywords } as any); 
+        const res = await window.electronAPI.downloadPlugin({ 
+          downloadUrl, 
+          aliasName: name, 
+          workspaceDir: useWorkspace ? finalWorkspaceDir : undefined, 
+          keywords: parsedKeywords 
+        } as any); 
         if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
       } catch (err: any) { setStatusMsg(`시스템 오류: ${err.message}`); }
       return;
     }
 
     if (pluginType === 'local') {
-      if (!customScriptPath || !name || !pluginWorkspaceDir) { setStatusMsg('오류: 모든 값을 기입해 주세요.'); return; }
-      const config = { id: `plugin-${Date.now()}`, type: 'custom' as any, name, enabled: true, scriptPath: customScriptPath, workspaceDir: pluginWorkspaceDir, keywords: parsedKeywords };
+      if (!customScriptPath || !name || (useWorkspace && !finalWorkspaceDir)) { 
+        setStatusMsg('오류: 모든 필수 값을 기입해 주세요.'); 
+        return; 
+      }
+      const config = { 
+        id: `plugin-${Date.now()}`, 
+        type: 'custom' as any, 
+        name, 
+        enabled: true, 
+        scriptPath: customScriptPath, 
+        workspaceDir: useWorkspace ? finalWorkspaceDir : undefined, 
+        keywords: parsedKeywords 
+      };
       try {
         const res = await window.electronAPI.addMcpPlugin(config);
         if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
@@ -176,6 +201,7 @@ export default function PluginsView() {
   const resetForm = () => {
     setName(''); setUrl(''); setApiKey(''); setDownloadUrl('');
     setCustomScriptPath(''); setPluginWorkspaceDir(''); setKeywordsInput('');
+    setUseWorkspace(true); // 플러그인 추가 모달 리셋 시 체크박스 기본 켜짐 초기화
     setStatusMsg(''); setIsAddModalOpen(false);
   };
 
@@ -186,10 +212,9 @@ export default function PluginsView() {
     if (res.success) refreshPluginsList();
   };
 
-  // 💡 [테마 치환] 하드코딩된 변수들을 CSS 변수형 명세로 교체합니다.
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 12px', borderRadius: '8px',
-    border: '1px solid var(--border-glass-input)',  // ← 수정
+    border: '1px solid var(--border-glass-input)',
     color: 'var(--color-text-main)', fontWeight: 500, fontSize: '0.9rem', outline: 'none',
     marginTop: '6px', boxSizing: 'border-box'
   };
@@ -244,6 +269,7 @@ export default function PluginsView() {
               {installedPlugins.map((p) => {
                 const isRemote = p.type === 'remote';
                 const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
+                const hasWorkspace = p.workspaceDir && p.workspaceDir.trim().length > 0;
                 
                 return (
                   <div 
@@ -277,8 +303,8 @@ export default function PluginsView() {
                         fontSize: '0.82rem', color: 'var(--color-text-main)', fontFamily: 'monospace', 
                         marginTop: '2px', wordBreak: 'break-all', whiteSpace: 'nowrap', 
                         overflow: 'hidden', textOverflow: 'ellipsis' 
-                      }} title={isRemote ? p.url : p.workspaceDir}>
-                        {isRemote ? p.url : p.workspaceDir}
+                      }} title={isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '지정되지 않음 (제한 없음)')}>
+                        {isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '🔓 지정되지 않음 (제한 없음)')}
                       </div>
                     </div>
 
@@ -297,7 +323,7 @@ export default function PluginsView() {
                           background: 'transparent', border: 'none',
                           color: menuOpenPluginId === p.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
                           cursor: 'pointer', padding: '4px', borderRadius: '4px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', //  대문자 C로 변경
                           zIndex: 10
                         }}
                         onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
@@ -307,7 +333,7 @@ export default function PluginsView() {
                       </button>
                     )}
 
-                    {/* 카드 내부 귀속형 absolute 드롭다운 상자 선언 */}
+                    {/* 카드 내부 메뉴 드롭다운 */}
                     {menuOpenPluginId === p.id && (
                       <div
                         ref={menuRef}
@@ -407,31 +433,53 @@ export default function PluginsView() {
                       <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API 키 보안 토큰" required style={inputStyle} />
                     </div>
                   </>
-                ) : pluginType === 'custom' ? (
-                  <>
-                    <div>
-                      <div style={labelStyle}>Plugin Download URL</div>
-                      <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../tool.js" required style={inputStyle} />
-                    </div>
-                    <div>
-                      <div style={labelStyle}>Target Workspace Path</div>
-                      <input type="text" value={pluginWorkspaceDir} onChange={e => setPluginWorkspaceDir(e.target.value)} placeholder="파일 작업 전용 디렉토리 절대경로" required style={inputStyle} />
-                    </div>
-                  </>
                 ) : (
                   <>
-                    <div>
-                      <div style={labelStyle}>JavaScript File Path</div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                        <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
-                        <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(128,128,128,0.1)', border: '1px solid rgba(128,128,128,0.15)', color: 'var(--color-text-main)', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
-                          파일 탐색
-                        </button>
+                    {pluginType === 'custom' ? (
+                      <div>
+                        <div style={labelStyle}>Plugin Download URL</div>
+                        <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../tool.js" required style={inputStyle} />
                       </div>
-                    </div>
-                    <div>
-                      <div style={labelStyle}>Target Workspace Path</div>
-                      <input type="text" value={pluginWorkspaceDir} onChange={e => setPluginWorkspaceDir(e.target.value)} placeholder="실제 파일 연동이 일어날 빈 작업 폴더 경로" required style={inputStyle} />
+                    ) : (
+                      <div>
+                        <div style={labelStyle}>JavaScript File Path</div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                          <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
+                          <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(128,128,128,0.1)', border: '1px solid rgba(128,128,128,0.15)', color: 'var(--color-text-main)', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                            파일 탐색
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 💡 체크박스를 토글하여 작업 공간 주입을 선택적으로 제어하는 유닛 블록 */}
+                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={useWorkspace} 
+                          onChange={(e) => {
+                            setUseWorkspace(e.target.checked);
+                            if(!e.target.checked) setPluginWorkspaceDir(''); // 체크 해제 시 명세 비우기
+                          }}
+                          style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                        />
+                        파일 작업 디렉토리(Workspace) 연동하기
+                      </label>
+
+                      {/* 체크가 true 일 때만 필드 렌더링 활성화 */}
+                      {useWorkspace && (
+                        <div style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
+                          <input 
+                            type="text" 
+                            value={pluginWorkspaceDir} 
+                            onChange={e => setPluginWorkspaceDir(e.target.value)} 
+                            placeholder={pluginType === 'custom' ? "파일 작업 전용 디렉토리 절대경로" : "실제 파일 연동이 일어날 빈 작업 폴더 경로"} 
+                            required={useWorkspace} 
+                            style={inputStyle} 
+                          />
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

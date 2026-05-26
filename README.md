@@ -21,13 +21,14 @@
 
 ## 소개
 
-Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단일 인터페이스에서 전환하며 사용할 수 있는 Electron 기반 데스크탑 앱입니다. MCP(Model Context Protocol) 플러그인 시스템을 통해 AI가 외부 도구와 파일 시스템에 직접 접근할 수 있습니다.
+Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단일 인터페이스에서 전환하며 사용할 수 있는 Electron 기반 데스크탑 앱입니다. 독자적인 MCP(Model Context Protocol) 플러그인 시스템을 통해 AI가 외부 도구와 로컬/원격 시스템에 직접 접근할 수 있습니다.
 
 **주요 기능**
 
 - 다중 LLM 엔진 등록 및 실시간 전환
 - 채팅 세션 관리 및 대화 히스토리 압축 요약
-- MCP 플러그인 에코시스템 (원격 / 로컬 / 다운로드)
+- MCP 플러그인 에코시스템 (원격 / 로컬 스크립트 / 다운로드)
+- 파일 작업 공간(`workspaceDir`) 선택적(Optional) 연동 및 샌드박싱 제어
 - 슬래시 커맨드(`/clear`, `/summary`, `/engine` 등)
 - 다크 / 라이트 테마 전환
 
@@ -52,8 +53,8 @@ Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단�
 | OS | 버전 | 지원 여부 |
 |---|---|:---:|
 | macOS | 13 Ventura 이상 | ✅ |
-| Windows | 10 / 11 (x64) | ✅ |
-| Linux | Ubuntu 22.04 이상 | ✅ |
+| Windows | 10 / 11 (x64) |  |
+| Linux | Ubuntu 22.04 이상 |  |
 
 ### LLM 공급자
 
@@ -78,7 +79,7 @@ Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단�
 
 ```bash
 # 저장소 클론
-git clone https://github.com/yourname/liminal-desktop.git
+git clone [https://github.com/yourname/liminal-desktop.git](https://github.com/yourname/liminal-desktop.git)
 cd liminal-desktop
 
 # 의존성 설치
@@ -89,9 +90,8 @@ npm run dev
 
 # 프로덕션 빌드
 npm run build
-```
 
-<br>
+```
 
 ## 엔진 등록
 
@@ -103,120 +103,122 @@ npm run build
 ```
 Provider:  openai
 Name:      GPT-4o
-URL:       https://api.openai.com/v1
+URL:       [https://api.openai.com/v1](https://api.openai.com/v1)
 Model:     gpt-4o
 API Key:   sk-...
-```
 
-<br>
+```
 
 ## 플러그인 작성 가이드
 
-Liminal Desktop의 플러그인은 CommonJS 스펙(`module.exports`)을 따르는 순수 자바스크립트 파일(`*.js`)입니다.
-AI가 유저의 문맥을 파악해 도구를 선택하고, 안전한 격리 공간(Sandbox) 안에서 실행되도록 아래 4가지 필수 구조를 반드시 구현해야 합니다.
+Liminal Desktop의 로컬형 플러그인은 공식 `@modelcontextprotocol/sdk` 모듈 및 `zod`를 활용하여 작성할 수 있는 Node.js 자바스크립트 스크립트 파일(`*.mjs`)입니다. 시스템과 플러그인은 표준 입출력(Stdio `stdin`/`stdout`) 채널을 통해 비동기 JSON-RPC 2.0 프로토콜 방식으로 통신합니다.
 
 ### 플러그인 유형
 
-| 유형 | 설명 | 용도 |
-|---|---|---|
-| `remote` | HTTP 엔드포인트로 외부 서버에 연결 | 사내 API, 외부 SaaS 연동 |
-| `custom` | URL에서 JS 스크립트를 다운로드하여 실행 | 배포된 공개 플러그인 |
-| `custom` | 로컬 `.js` 파일을 직접 연결 | 직접 작성한 커스텀 도구 |
+| 유형 | 설명 | 작업 공간(`workspaceDir`) 요구 여부 |
+| --- | --- | --- |
+| `remote` | HTTP 엔드포인트로 외부 서버(FastAPI 등)에 연결 | ❌ 불필요 |
+| `custom` | URL에서 `.mjs` 스크립트를 다운로드하여 실행 | ⚠️ 선택적 주입 (`useWorkspace` 토글) |
+| `custom` | 로컬 환경의 `.mjs` 파일을 시스템에 직접 연결 | ⚠️ 선택적 주입 (`useWorkspace` 토글) |
 
 ---
 
-### 표준 템플릿
+### 표준 템플릿 (`*.mjs`)
 
-새 플러그인을 만들 때 아래 구조를 복사해 비즈니스 로직을 채워 넣으세요.
+새로운 로컬 플러그인을 정의할 때 아래 가이드라인 구조를 참고하여 비즈니스 로직을 구현하세요. 메인 클라이언트 앱과의 키워드 연동을 위해 `stdout.write` 통로를 제어하는 전용 인터셉터 로직이 하단에 결합되어야 합니다.
 
-```js
-// my-mcp-plugin.js
-const fs = require('fs/promises');
-const path = require('path');
+```javascript
+// my-mcp-plugin.mjs
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import path from 'path';
+import fs from 'fs/promises';
 
-module.exports = {
+// ====================== 1. 서버 초기화 ======================
+const server = new McpServer({
+  name: 'advanced-file-plugin',
+  version: '1.0.0'
+});
 
-  // 1. 메타데이터 ─────────────────────────────────────────────────────────
-  id: "mcp-custom-tool",      // 시스템 내부 고유 영문 ID (중복 불가)
-  name: "커스텀 기능 확장 툴", // UI에 노출되는 이름
+// 💡 시스템(StdioMcpPlugin)이 선택적으로 주입한 환경변수 바인딩
+const workspaceDir = process.env.WORKSPACE_DIR ? path.resolve(process.env.WORKSPACE_DIR) : null;
 
+// ====================== 2. 고유 키워드 정의 ======================
+// 💡 메인 앱의 동적 문맥 필터링 스위치로 사용될 고유 키워드 리스트
+const keywords = ['파일', '메모', '저장', 'file', 'memo', 'save', 'txt'];
 
-  // 2. 동적 필터링 키워드 ──────────────────────────────────────────────────
-  // 유저 프롬프트에 아래 단어가 포함될 때만 이 플러그인의 도구가 AI에 주입됩니다.
-  // 비워두거나 선언하지 않으면 모든 대화에서 상시 대기합니다.
-  keywords: ['샘플', '데이터', '테스트', 'sample', 'data'],
+// Safe Path Helper: 샌드박스(Directory Traversal) 방어
+const resolveSafePath = (filename) => {
+  if (!workspaceDir) {
+    throw new Error('❌ 이 도구를 실행하려면 플러그인 설정에서 Workspace 경로를 연동해야 합니다.');
+  }
+  const fullPath = path.resolve(workspaceDir, filename);
+  if (!fullPath.startsWith(workspaceDir)) {
+    throw new Error('❌ 보안 오류: 작업 공간 외부 경로에는 접근할 수 없습니다.');
+  }
+  return fullPath;
+};
 
-
-  // 3. AI 주입용 도구 명세 (JSON Schema) ────────────────────────────────────
-  async listTools() {
-    return [
-      {
-        name: 'execute_sample_job',
-        // AI가 도구 사용 여부를 판단하는 핵심 기준문 — 구체적으로 작성할수록 정확도가 높아집니다.
-        description: '[샘플] 지정된 작업 공간에 파일을 생성하고 데이터를 기록합니다.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            targetName: {
-              type: 'string',
-              description: '생성할 파일명 (예: result.json)'
-            },
-            payload: {
-              type: 'string',
-              description: '파일에 기록할 본문 데이터'
-            }
-          },
-          required: ['targetName', 'payload']
-        }
-      }
-    ];
+// ====================== 3. 도구 등록 ======================
+server.tool(
+  'write_text_file',
+  '지정된 작업 공간에 텍스트 파일을 생성하고 데이터를 기록합니다.',
+  {
+    filename: z.string().describe('생성할 파일명 (예: memo.txt)'),
+    content: z.string().describe('파일에 기록할 본문 데이터')
   },
-
-
-  // 4. 도구 실행 핸들러 ────────────────────────────────────────────────────
-  /**
-   * @param {string} name    - 호출된 도구 이름 (네임스페이스 접두사 제거 상태)
-   * @param {object} args    - AI가 JSON Schema에 맞춰 조립한 인자 값
-   * @param {object} context - Electron 메인 프로세스가 주입하는 환경 변수
-   *   context.workspaceDir  - 유저가 등록 시 지정한 실제 파일 작업 공간 경로
-   */
-  async callTool(name, args, context) {
-    const workspaceDir = context?.workspaceDir || './workspace';
-
+  async ({ filename, content }) => {
     try {
-      if (name.endsWith('execute_sample_job')) {
-        const filePath = path.join(workspaceDir, args.targetName);
+      const safePath = resolveSafePath(filename);
 
-        // 🛡️ 보안 필수: Directory Traversal Attack 방어
-        // ../../ 등으로 상위 경로를 타고 올라가는 시도를 원천 차단합니다.
-        if (!filePath.startsWith(workspaceDir)) {
-          throw new Error('샌드박스 작업 공간 외부 경로에는 접근할 수 없습니다.');
-        }
+      await fs.mkdir(path.dirname(safePath), { recursive: true });
+      await fs.writeFile(safePath, content, 'utf-8');
 
-        await fs.mkdir(workspaceDir, { recursive: true });
-        await fs.writeFile(filePath, args.payload, 'utf-8');
-
-        // 💡 리턴 포맷 규격: 반드시 아래 구조를 준수해야 LLM이 결과를 인식합니다.
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `✅ [${workspaceDir}] 안에 [${args.targetName}] 파일 작성을 완료했습니다.`
-            }
-          ]
-        };
-      }
-
-      throw new Error(`구현되지 않은 도구 호출: ${name}`);
-
-    } catch (error) {
-      // 에러는 반드시 잡아서 문자열로 반환 — 앱 전체가 죽지 않도록 격리합니다.
       return {
-        content: [{ type: 'text', text: `❌ 플러그인 실행 실패: ${error.message}` }]
+        content: [{
+          type: 'text',
+          text: `✅ 파일 작성 완료: ${filename}`
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `❌ 실행 실패: ${error.message}` }]
       };
     }
   }
+);
+
+// ====================== 💡 4. 핵심: 독자 규격 키워드 인터셉터 바인딩 ======================
+// 공식 SDK 호환성을 깨지 않으면서, 메인 앱의 getAllToolsForLlm 필터링 메커니즘과 연동하는 핵심 허브
+const originalWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = (chunk, encoding, callback) => {
+  try {
+    const rawText = chunk.toString();
+    const lines = rawText.split('\n');
+    const processedLines = lines.map(line => {
+      if (!line.trim()) return line;
+      try {
+        const packet = JSON.parse(line);
+        // 메인 프로세스가 tools/list 조회를 요청한 정상 응답 패킷 구조인 경우
+        if (packet.result && packet.result.tools && !packet.error) {
+          // 💡 응답 객체에 상단에서 정의한 고유 키워드 배열을 동적으로 탑재하여 가로챔
+          packet.result.keywords = keywords;
+        }
+        return JSON.stringify(packet);
+      } catch (e) {
+        return line; // JSON 포맷이 아닌 일반 console 로그 스트림 등은 바이패스
+      }
+    });
+    return originalWrite(processedLines.join('\n'), encoding, callback);
+  } catch (err) {
+    return originalWrite(chunk, encoding, callback);
+  }
 };
+
+// ====================== 5. 서버 시작 ======================
+const transport = new StdioServerTransport();
+await server.connect(transport);
 ```
 
 ---
@@ -225,84 +227,65 @@ module.exports = {
 
 #### 1. 동적 문맥 필터링 (토큰 절약)
 
-플러그인의 `keywords` 배열과 유저 메시지를 실시간으로 대조해, 관련 있는 도구만 AI에 주입합니다.
+플러그인의 `tools/list` 방출 시 인터셉터로 가로채 주입한 `keywords` 배열과 유저 프롬프트를 실시간 대조하여, 관련성이 높은 문맥의 도구 세트만 최적화하여 AI 엔진 주입 레이어에 노출시킵니다.
 
 ```
-유저: "사양 체크해줘"  →  keywords: ['사양', '시스템'] 인 플러그인만 활성화
-유저: "파일 저장해줘"  →  keywords: ['파일', '저장'] 인 플러그인만 활성화
-keywords 미선언       →  상시 대기조 — 모든 대화에서 항상 포함
+유저: "사양 체크해줘"  →  keywords에 '사양' 또는 '시스템'이 명시된 플러그인만 필터 활성화
+유저: "파일 저장해줘"  →  keywords에 '파일' 또는 '저장'이 명시된 플러그인만 필터 활성화
+Keywords 미선언       →  상시 활성화 상태로 대기 (모든 대화 문맥에 도구 포함)
+
 ```
 
 #### 2. 파괴적 명령 관문 제어 (Confirm 인터셉터)
 
-도구 이름이 `write_text_file` 또는 `delete_file`로 끝나는 경우, 실행 직전 Electron 네이티브 경고 팝업이 강제로 트리거됩니다. 유저가 승인해야만 `callTool`로 명령이 전달됩니다.
+도구 이름이 `write_text_file` 또는 `delete_file`로 끝나는 명령 판정이 감지되면, 실행 직전 Electron 메인 컨텍스트 수준에서 네이티브 컨펌 알림창(`dialog.showMessageBox`)을 트리거합니다. 최종 사용자가 물리적으로 승인(Execute)을 확정해야만 서브 프로세스로 데이터 파이프가 연결되는 안전장치가 작동합니다.
 
-```
-AI 도구 호출 요청
-      ↓
-도구명 ends with 'write_text_file' | 'delete_file' ?
-      ↓ YES
-  Electron confirm() 팝업 → 유저 승인
-      ↓
-  callTool() 실행
-```
+#### 3. 유연한 작업 공간(Workspace) 정책
 
-#### 3. 런타임 캐시 킬러 (핫 리로드)
+로컬 파일 시스템 입출력이 불필요한 연동형 플러그인(예: 웹 스크래퍼, 하드웨어 사양 조회 등)의 경우 UI 단의 **'파일 작업 디렉토리(Workspace) 연동하기' 체크박스를 해제**하여 샌드박싱 환경변수 주입 단계가 생략된 컴팩트한 격리 권한 상태로 구동할 수 있습니다.
 
-플러그인 코드를 수정한 뒤 앱을 재시작할 필요가 없습니다.
+#### 4. 런타임 프로세스 리로드 (핫 리로드)
 
-1. Plugin Manager에서 해당 플러그인 **삭제**
-2. 동일한 경로로 **재등록 (Link & Activate)**
-
-시스템이 `require.cache`를 자동으로 초기화하여 변경된 최신 코드를 즉시 반영합니다.
+스크립트 내부 구문을 리팩토링한 뒤 전체 메인 애플리케이션을 껐다 켤 필요가 없습니다. Plugin Manager 화면에서 대상을 **삭제(Delete)** 처리한 후 재연동(**Link & Activate**)을 실행하면, 메인 매니저가 기존 하위 프로세스를 온전하게 `kill`한 후 `require.cache` 버퍼 라인을 밀어내어 실시간 변경 지점을 반영합니다.
 
 ---
 
 ### `inputSchema` 파라미터 타입 레퍼런스
 
-```js
-properties: {
-  // 문자열
-  filename: { type: 'string', description: '파일명 (확장자 포함)' },
+`McpServer.tool` 정의 시 `zod` 컴포넌트 구조를 사용하여 스키마 객체를 형성하면 아래 명세 구조로 정밀 가공되어 기계학습 엔진 아규먼트로 치환됩니다.
 
-  // 숫자
-  count: { type: 'number', description: '최대 항목 수', default: 10 },
-
-  // 불리언
-  overwrite: { type: 'boolean', description: '덮어쓰기 여부' },
-
-  // 열거형
-  format: { type: 'string', enum: ['json', 'csv', 'txt'], description: '출력 포맷' },
-
-  // 배열
-  tags: { type: 'array', items: { type: 'string' }, description: '태그 목록' }
+```javascript
+// Zod 스키마 구성 예시 명세
+{
+  filename: z.string().describe('파일명 (확장자 포함)'),
+  count: z.number().optional().default(10).describe('최대 처리 항목 수'),
+  overwrite: z.boolean().describe('덮어쓰기 수행 여부'),
+  format: z.enum(['json', 'csv', 'txt']).describe('출력 데이터 포맷'),
+  tags: z.array(z.string()).describe('태그 식별 목록')
 }
+
 ```
 
 ---
 
-### 등록 방법 (local 타입 기준)
+### 등록 방법 (Local Script File 타입 기준)
 
-1. Plugin Manager > **Add Plugin** 클릭
-2. Plugin Type → `Local Script File` 선택
-3. 작성한 `.js` 파일 경로 지정 (파일 탐색 버튼 사용 가능)
-4. 플러그인이 접근할 **Workspace 디렉토리** 절대경로 입력
-5. 트리거 키워드 입력 (쉼표 구분, 비워두면 상시 대기)
-6. **Link & Activate** 클릭
+1. **MCP Ecosystem** 대시보드 우측 상단 **Add Plugin** 버튼을 클릭합니다.
+2. **Plugin Type**에서 `Local Script File`을 선택합니다.
+3. 작성한 파일이 자바스크립트 표준 모듈 형식을 따르도록 확장자를 `*.mjs`로 변경한 뒤, **파일 탐색** 버튼을 통해 경로를 지정합니다.
+4. 해당 툴이 로컬 파일 저장 및 가공 역할을 수행한다면 **'파일 작업 디렉토리(Workspace) 연동하기'** 체크박스를 활성화하고 경로를 주입합니다. 단순 조회/원격 연동용 툴이라면 체크박스를 비활성화합니다.
+5. 트리거 컨텍스트 단어(쉼표로 구분)를 입력합니다. (비워둘 시 전체 문맥 상시 활성화)
+6. **Link & Activate** 버튼을 클릭하여 적용합니다.
 
 ---
 
 ### 작성 체크리스트
 
-- [ ] `id`가 다른 플러그인과 중복되지 않는가
-- [ ] `listTools()`의 각 도구에 `description`을 구체적으로 작성했는가
-- [ ] `inputSchema`의 `required` 배열이 정확한가
-- [ ] `callTool()`에서 모든 도구 이름 케이스를 처리했는가
-- [ ] Directory Traversal 방어 코드가 포함되어 있는가
-- [ ] 에러를 `try/catch`로 감싸고 `content` 포맷으로 반환하는가
-- [ ] 파일 접근은 `context.workspaceDir` 내부로만 제한했는가
-
-<br>
+* [ ] 구현된 스크립트 확장자가 명확히 ES Module 사양의 `*.mjs` 형식으로 지정되어 있는가
+* [ ] 공식 `@modelcontextprotocol/sdk` 규격 모듈과 `zod` 체인이 정상 연동되어 있는가
+* [ ] 메인 클라이언트 앱의 필터 체인 연동을 위한 stdout 인터셉터 코드와 플러그인 전용 `keywords` 맵이 제대로 바인딩되어 있는가
+* [ ] 파일 트래버설 공격 방어(`startsWith`) 및 주입되지 않은 `WORKSPACE_DIR` 상태 분기 예외 설계가 되어 있는가
+* [ ] 예외 처리를 위해 내부 비즈니스 로직 단위가 안정적인 구조로 마감되어 있는가
 
 ## 라이선스
 
