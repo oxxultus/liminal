@@ -1,5 +1,5 @@
 // src/renderer/App.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ChatView from './components/ChatView';
 import SettingsView from './components/SettingsView';
 import PluginsView from './components/PluginsView';
@@ -66,6 +66,16 @@ const Icon = {
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
     </svg>
   ),
+  Edit: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/>
+    </svg>
+  ),
+  More: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+    </svg>
+  )
 };
 
 export default function App() {
@@ -77,6 +87,16 @@ export default function App() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
+
+  // 💡 더보기 컨텍스트 메뉴 State
+  const [menuOpenSessionId, setMenuOpenSessionId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 💡 [개조] 이름 변경 전용 독립 모달 팝업 상태 트리거
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [targetRenameSessionId, setTargetRenameSessionId] = useState<string | null>(null);
+  const [editTitleInput, setEditTitleInput] = useState<string>('');
 
   const loadEngines = async () => {
     setIsLoading(true);
@@ -98,6 +118,17 @@ export default function App() {
 
   useEffect(() => { loadEngines(); loadSessions(); }, []);
 
+  // 외부 클릭 시 미니 컨텍스트 메뉴 닫기 유틸리티
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenSessionId(null);
+      }
+    };
+    if (menuOpenSessionId) document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [menuOpenSessionId]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
@@ -118,16 +149,48 @@ export default function App() {
     setCurrentView('chat');
   };
 
-  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation();
+  const handleDeleteSession = async (sessionId: string) => {
     await window.electronAPI.deleteSession(sessionId);
     const remaining = sessions.filter(s => s.id !== sessionId);
     setSessions(remaining);
     if (activeSessionId === sessionId) {
       setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
     }
+    setMenuOpenSessionId(null);
   };
 
+  // 💡 [변경] 이름 수정 메뉴 클릭 시 모달 팝업 가동 활성화
+  const handleStartRenameModal = (id: string, currentTitle: string) => {
+    setTargetRenameSessionId(id);
+    setEditTitleInput(currentTitle);
+    setIsRenameModalOpen(true);
+    setMenuOpenSessionId(null);
+  };
+
+  // 💡 [변경] 팝업창 내부에서 '저장'을 완결하는 공통 함수
+  const handleSaveRenamePopup = async () => {
+    if (!targetRenameSessionId || !editTitleInput.trim()) {
+      setIsRenameModalOpen(false);
+      return;
+    }
+    await window.electronAPI.updateChatSessionTitle?.({ sessionId: targetRenameSessionId, title: editTitleInput.trim() }).catch(() => {});
+    setSessions(prev => prev.map(s => s.id === targetRenameSessionId ? { ...s, title: editTitleInput.trim() } : s));
+    setIsRenameModalOpen(false);
+    setTargetRenameSessionId(null);
+  };
+
+  const handleOpenMenu = (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    if (menuOpenSessionId === sessionId) {
+      setMenuOpenSessionId(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 4, left: rect.left - 75 });
+    setMenuOpenSessionId(sessionId);
+  };
+
+  const activeSession = sessions.find(s => s.id === activeSessionId);
   const activeEngine = engines.find(e => e.id === activeEngineId) || engines[0];
 
   const menuItems = [
@@ -140,8 +203,6 @@ export default function App() {
     <div style={{
       display: 'flex', width: '100vw', height: '100vh',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      
-      /* 🤍 차분한 다크 소프트 엠버 그레이 텍스트 및 프레임 매핑 */
       color: '#2D2D35',
       background: 'linear-gradient(135deg, #F9F9FB 0%, #F4F4F6 50%, #EAEAEF 100%)',
       position: 'relative', borderRadius: '14px', overflow: 'hidden',
@@ -154,8 +215,6 @@ export default function App() {
         minWidth: isSidebarOpen ? '240px' : '0px',
         opacity: isSidebarOpen ? 1 : 0,
         pointerEvents: isSidebarOpen ? 'auto' : 'none',
-        
-        /* 🤍 오프화이트 레이어 안개 굴절 효과 */
         backgroundColor: 'rgba(244, 244, 246, 0.4)',
         backdropFilter: 'blur(40px)',
         borderRight: isSidebarOpen ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
@@ -183,8 +242,7 @@ export default function App() {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               width: '100%', padding: '10px 14px', borderRadius: '10px', marginBottom: '16px',
-              background: 'rgba(0, 0, 0, 0.03)',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
+              background: 'rgba(0, 0, 0, 0.03)', border: '1px solid rgba(0, 0, 0, 0.08)',
               color: '#2D2D35', fontSize: '0.85rem', fontWeight: 600,
               cursor: 'pointer', transition: 'all 0.15s ease', flexShrink: 0,
             }}
@@ -206,6 +264,7 @@ export default function App() {
                 {sessions.map(session => {
                   const isActive = activeSessionId === session.id;
                   const isHovered = hoveredSessionId === session.id;
+                  
                   return (
                     <div
                       key={session.id}
@@ -218,28 +277,33 @@ export default function App() {
                         cursor: 'pointer',
                         border: isActive ? '1px solid rgba(0, 0, 0, 0.03)' : '1px solid transparent',
                         transition: 'all 0.12s ease', boxSizing: 'border-box',
+                        height: '34px', position: 'relative'
                       }}
                       onClick={() => { setActiveSessionId(session.id); setCurrentView('chat'); }}
                       onMouseEnter={() => setHoveredSessionId(session.id)}
                       onMouseLeave={() => setHoveredSessionId(null)}
                     >
                       <span style={{ flexShrink: 0, opacity: 0.6 }}><Icon.MessageCircle /></span>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, paddingRight: '20px' }}>
                         {session.title}
                       </span>
-                      {(isHovered || isActive) && (
+
+                      {/* 호버 시 우측 컨텍스트 점 세개 더보기 버튼 노출 */}
+                      {(isHovered || isActive || menuOpenSessionId === session.id) && (
                         <button
-                          onClick={(e) => handleDeleteSession(e, session.id)}
+                          onClick={(e) => handleOpenMenu(e, session.id)}
                           style={{
+                            position: 'absolute', right: '8px',
                             background: 'transparent', border: 'none',
-                            color: '#9E9EAF', cursor: 'pointer',
-                            padding: '2px', borderRadius: '4px', flexShrink: 0,
-                            display: 'flex', alignItems: 'center', transition: 'color 0.1s',
+                            color: menuOpenSessionId === session.id ? '#2D2D35' : '#9E9EAF', 
+                            cursor: 'pointer', padding: '4px', borderRadius: '4px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#9E9EAF')}
-                          title="삭제"
-                        ><Icon.Trash /></button>
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)')}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          <Icon.More />
+                        </button>
                       )}
                     </div>
                   );
@@ -341,6 +405,7 @@ export default function App() {
                 activeEngine={activeEngine}
                 onProviderChange={setActiveEngineId}
                 sessionId={activeSessionId}
+                currentTitle={activeSession?.title} 
                 onTitleUpdate={loadSessions}
               />
             ) : (
@@ -351,8 +416,7 @@ export default function App() {
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '8px',
                     padding: '10px 24px', borderRadius: '10px',
-                    background: 'rgba(0, 0, 0, 0.03)',
-                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    background: 'rgba(0, 0, 0, 0.03)', border: '1px solid rgba(0, 0, 0, 0.08)',
                     color: '#2D2D35', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
                   }}
                 ><Icon.Plus /> 새 채팅 시작</button>
@@ -365,6 +429,112 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* ── 미니 컨텍스트 조작 메뉴 ── */}
+      {menuOpenSessionId && (
+        <div
+          ref={menuRef}
+          style={{
+            position: 'absolute', top: menuPosition.top, left: menuPosition.left,
+            backgroundColor: 'rgba(255, 255, 255, 0.96)', backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: '10px',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08)', padding: '4px', zIndex: 9999,
+            display: 'flex', flexDirection: 'column', gap: '1px', width: '110px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              const targetSession = sessions.find(s => s.id === menuOpenSessionId);
+              if (targetSession) handleStartRenameModal(menuOpenSessionId, targetSession.title);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+              border: 'none', background: 'transparent', borderRadius: '6px',
+              fontSize: '0.78rem', fontWeight: 500, color: '#2D2D35', cursor: 'pointer',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Icon.Edit /> 이름 변경
+          </button>
+          <button
+            onClick={() => handleDeleteSession(menuOpenSessionId)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+              border: 'none', background: 'transparent', borderRadius: '6px',
+              fontSize: '0.78rem', fontWeight: 500, color: '#ef4444', cursor: 'pointer',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+          >
+            <Icon.Trash /> 삭제하기
+          </button>
+        </div>
+      )}
+
+      {/* ── 💡 [신규 추가] 완전히 독립된 중앙 글래스모피즘 이름 변경 모달 팝업 레이어 ── */}
+      {isRenameModalOpen && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
+        }} onClick={() => setIsRenameModalOpen(false)}>
+          <div style={{
+            width: '320px', padding: '20px', borderRadius: '16px',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 245, 250, 0.9) 100%)',
+            border: '1px solid rgba(0, 0, 0, 0.15)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
+            display: 'flex', flexDirection: 'column', gap: '14px'
+          }} onClick={e => e.stopPropagation()}>
+            
+            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#2D2D35' }}>채팅방 이름 변경</div>
+            
+            <input
+              type="text"
+              value={editTitleInput}
+              onChange={e => setEditTitleInput(e.target.value)}
+              placeholder="변경할 이름을 입력하세요"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSaveRenamePopup();
+                if (e.key === 'Escape') setIsRenameModalOpen(false);
+              }}
+              style={{
+                width: '100%', padding: '10px 12px', fontSize: '0.88rem',
+                border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: '8px',
+                outline: 'none', backgroundColor: '#FFFFFF', color: '#111111',
+                boxSizing: 'border-box'
+              }}
+            />
+            
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <button
+                onClick={() => setIsRenameModalOpen(false)}
+                style={{
+                  padding: '8px 14px', border: 'none', background: 'rgba(0,0,0,0.05)',
+                  borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.05)')}
+              >취소</button>
+              <button
+                onClick={handleSaveRenamePopup}
+                disabled={!editTitleInput.trim()}
+                style={{
+                  padding: '8px 14px', border: 'none', background: '#2D2D35',
+                  borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: '#FFFFFF',
+                  cursor: editTitleInput.trim() ? 'pointer' : 'not-allowed',
+                  opacity: editTitleInput.trim() ? 1 : 0.5
+                }}
+                onMouseEnter={e => { if (editTitleInput.trim()) e.currentTarget.style.background = '#1A1A20'; }}
+                onMouseLeave={e => { if (editTitleInput.trim()) e.currentTarget.style.background = '#2D2D35'; }}
+              >저장</button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

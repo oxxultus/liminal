@@ -2,11 +2,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EngineConfig } from '../App';
 
+// 💡 마크다운 파싱 및 문법 하이라이팅 컴포넌트 임포트
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
 interface ChatViewProps {
   engines: EngineConfig[];
   activeEngine: EngineConfig;
   onProviderChange: (id: string) => void;
   sessionId: string;
+  // 💡 [예외 처리 추가] 수동 변경 여부 감지를 위해 현재 방의 제목(currentTitle)을 주입받습니다.
+  currentTitle?: string; 
   onTitleUpdate: (sessionId: string, newTitle: string) => void;
 }
 
@@ -37,7 +45,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { command: '/help',    description: '사용 가능한 커맨드 목록',       icon: '❓' },
 ];
 
-export default function ChatView({ engines, activeEngine, onProviderChange, sessionId, onTitleUpdate }: ChatViewProps) {
+export default function ChatView({ engines, activeEngine, onProviderChange, sessionId, currentTitle = '새 채팅', onTitleUpdate }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -308,7 +316,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
-  // ── 💡 [대폭 개조] 비동기 제어권 위임 및 완벽 보장형 전송 함수 ──
+  // ── 비동기 제어권 위임 및 완벽 보장형 전송 함수 ──
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     if (input.startsWith('/')) {
@@ -321,22 +329,31 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
 
     const userText = input.trim();
+    
+    // 💡 [2중 예외 방어 메커니즘 가동]
+    // 1) 기존 대화 내역에 유저 메시지가 없고
+    // 2) 현재 룸의 상태가 유저가 가공하지 않은 순수 기본 명세('새 채팅') 상태일 때만 자동 타이틀 승인!
     const isFirstUserMessage = !apiConversation.some(m => m.role === 'user');
+    const isDefaultTitle = currentTitle === '새 채팅'; 
+    const shouldUpdateTitle = isFirstUserMessage && isDefaultTitle;
 
     setMessages(prev => [...prev, { id: generateId(), sender: 'user', text: userText }]);
     setInput('');
-    setLoading(true); // 💡 점 세 개 가동 시작
+    setLoading(true);
 
     try {
       await saveMessage('user', userText);
-      if (isFirstUserMessage) await updateSessionTitle(userText);
+      
+      // 💡 두 조건이 완벽히 합치될 때만 첫 입력 자동 요약 타이틀 가동
+      if (shouldUpdateTitle) {
+        await updateSessionTitle(userText);
+      }
 
       let updatedHistory = [...apiConversation, { role: 'user', content: userText }];
       if (apiConversation.length >= SUMMARY_TRIGGER) {
         updatedHistory = await compressWithSummary(updatedHistory);
       }
 
-      // 🔌 1. 고정 정적 도구 명세 수집 및 주입
       const rawTools: any[] = await window.electronAPI.getMcpTools();
       const toolsByProvider: Record<string, any[]> = {
         anthropic: rawTools.map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
@@ -345,8 +362,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
       };
       const tools = toolsByProvider[activeEngine.provider] ?? [];
 
-      // 🔌 2. 메인 백엔드 무한루프 프록시 엔진 가동
-      // 이제 백엔드가 모든 크롤링과 요약 처리를 한 번에 완료하여 최종 답변을 내려줍니다.
       const proxyRes = await window.electronAPI.sendChat({
         engine: activeEngine, 
         messages: updatedHistory,
@@ -356,13 +371,11 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
 
       if (!proxyRes.success) throw new Error(proxyRes.error);
 
-      // 🔌 3. 최종 완성된 텍스트 결과물을 화면에 반영 및 메모리 저장
       const botResponseText = proxyRes.data?.text || '';
       if (botResponseText) {
         setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: botResponseText }]);
         await saveMessage('assistant', botResponseText);
         
-        // 다음 턴 대화를 위해 히스토리에 최종 축적 결과 동기화
         if (activeEngine.provider === 'openai' && proxyRes.data.rawMessage) {
           updatedHistory.push(proxyRes.data.rawMessage);
         } else {
@@ -375,7 +388,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
       console.error("Renderer Chat Error:", error);
       setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: `❌ 에러: ${error.message}` }]);
     } finally {
-      // 💡 [무한 대기 격파 핵심] 성공, 실패 여부 상관없이 마무리에 도달하면 무조건 점 세개 로딩을 끕니다.
       setLoading(false);
     }
   };
@@ -425,11 +437,45 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                     maxWidth: '85%', 
                     lineHeight: 1.6, 
                     fontSize: '0.95rem', 
-                    whiteSpace: 'pre-wrap', 
-                    wordBreak: 'break-word',
                     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
                   }}>
-                    {msg.text}
+                    {isUser ? (
+                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.text}</div>
+                    ) : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code({ node, inline, className, children, ...props }: any) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            return !inline && match ? (
+                              <div style={{ borderRadius: '8px', overflow: 'hidden', margin: '12px 0', fontSize: '0.88rem', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                                <SyntaxHighlighter
+                                  style={vscDarkPlus as any}
+                                  language={match[1]}
+                                  PreTag="div"
+                                  {...props}
+                                >
+                                  {String(children).replace(/\n$/, '')}
+                                </SyntaxHighlighter>
+                              </div>
+                            ) : (
+                              <code style={{ background: 'rgba(0,0,0,0.06)', padding: '2px 5px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em', fontWeight: 600 }} {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontWeight: 700, textDecoration: 'underline' }}>{children}</a>
+                          ),
+                          ul: ({ children }) => <ul style={{ paddingLeft: '20px', margin: '6px 0' }}>{children}</ul>,
+                          ol: ({ children }) => <ol style={{ paddingLeft: '20px', margin: '6px 0' }}>{children}</ol>,
+                          li: ({ children }) => <li style={{ marginBottom: '4px' }}>{children}</li>,
+                          p: ({ children }) => <p style={{ margin: '4px 0 8px 0', wordBreak: 'break-word' }}>{children}</p>
+                        }}
+                      >
+                        {msg.text}
+                      </ReactMarkdown>
+                    )}
                   </div>
                 </div>
               );
@@ -508,7 +554,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
             borderRadius: '24px', 
             padding: '6px 8px 6px 18px', 
             backdropFilter: 'blur(30px)', 
-            WebkitBackdropFilter: 'blur(30px)',
+            WebkitAppRegion: 'no-drag',
             border: showSlashMenu ? '1px solid #1A1A1E' : '1px solid rgba(0, 0, 0, 0.12)', 
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
             transition: 'border-color 0.2s, box-shadow 0.2s' 

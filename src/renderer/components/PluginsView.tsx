@@ -1,332 +1,530 @@
 // src/renderer/components/PluginsView.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+const Icon = {
+  Plus: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  ),
+  Trash: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+    </svg>
+  ),
+  Globe: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+  ),
+  Terminal: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+    </svg>
+  ),
+  Edit: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/>
+    </svg>
+  ),
+  More: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+    </svg>
+  )
+};
 
 export default function PluginsView() {
+  const [installedPlugins, setInstalledPlugins] = useState<any[]>([]);
+  const [statusMsg, setStatusMsg] = useState('');
+  const [hoveredPluginId, setHoveredPluginId] = useState<string | null>(null);
+
+  // 모달 제어 상태 스위치
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
+
+  // 더보기 컨텍스트 메뉴용 제어 상태
+  const [menuOpenPluginId, setMenuOpenPluginId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 폼 입력 관리 유닛 상태
   const [pluginType, setPluginType] = useState<'remote' | 'custom' | 'local'>('remote');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [statusMsg, setStatusMsg] = useState('');
-  const [installedPlugins, setInstalledPlugins] = useState<any[]>([]);
   const [downloadUrl, setDownloadUrl] = useState('');
-
-  // 1. 실행할 로컬 JS 스크립트 파일의 절대 경로 State
   const [customScriptPath, setCustomScriptPath] = useState('');
-  // 2. 다운로드(custom)와 로컬 파일(local)이 공용으로 사용할 작업 공간 폴더 경로 State
   const [pluginWorkspaceDir, setPluginWorkspaceDir] = useState('');
-  
-  // 💡 [신규 추가] 사용자가 직접 타이핑한 트리거 키워드 문자열 State (예: "파일,메모,로그")
   const [keywordsInput, setKeywordsInput] = useState('');
+  
+  // 수정 타겟팅 포인터
+  const [targetPluginId, setTargetPluginId] = useState<string | null>(null);
 
-  // 디바이스에 등록된 전체 MCP 플러그인 리스트 갱신
   const refreshPluginsList = async () => {
     const list = await window.electronAPI.getMcpPluginsList();
     setInstalledPlugins(list || []);
   };
 
-  useEffect(() => {
-    refreshPluginsList();
-  }, []);
+  useEffect(() => { refreshPluginsList(); }, []);
 
-  // Electron 네이티브 파일 선택 다이얼로그 호출
+  // 외부 클릭 감지 리스너
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenPluginId(null);
+      }
+    };
+    if (menuOpenPluginId) document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [menuOpenPluginId]);
+
   const handleSelectFile = async () => {
     try {
       const result = await window.electronAPI.openFileDialog();
       if (result && !result.canceled && result.filePaths.length > 0) {
         setCustomScriptPath(result.filePaths[0]);
-        setStatusMsg('스크립트 파일 경로가 성공적으로 매핑되었습니다.');
       }
-    } catch (err: any) {
-      setStatusMsg(`파일 선택 실패: ${err.message}`);
+    } catch (err: any) { alert(`파일 선택 실패: ${err.message}`); }
+  };
+
+  // 💡 [초소형화] 이제 스크롤/화면 좌표를 계산하지 않고 상태값만 스위칭합니다!
+  const handleOpenMenu = (e: React.MouseEvent, pluginId: string) => {
+    e.stopPropagation();
+    if (menuOpenPluginId === pluginId) {
+      setMenuOpenPluginId(null);
+    } else {
+      setMenuOpenPluginId(pluginId);
     }
   };
 
-  // 플러그인 동적 등록 핸들러
-  const handleAddPlugin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatusMsg('초기화 중...');
+  const handleStartEditModal = (id: string, currentName: string, currentKeywords: any) => {
+    setTargetPluginId(id);
+    setName(currentName);
+    const keywordsStr = Array.isArray(currentKeywords) ? currentKeywords.join(',') : String(currentKeywords || '');
+    setKeywordsInput(keywordsStr);
+    
+    setIsEditModalOpen(true);
+    setMenuOpenPluginId(null);
+  };
 
-    // 💡 [공통 전처리] 입력받은 콤마 구분 키워드 문자열을 정제된 string[] 배열로 변환합니다.
+  const handleSaveEditPopup = async () => {
+    if (!targetPluginId || !name.trim()) return;
+
     const parsedKeywords = keywordsInput
       ? keywordsInput.split(',').map(k => k.trim()).filter(Boolean)
       : [];
 
-    // 분기 1. 외부 URL 원격 파일 다운로드 모드 (custom)
-    if (pluginType === 'custom') {
-      if (!downloadUrl || !name || !pluginWorkspaceDir) {
-        setStatusMsg('오류: 별칭, 다운로드 주소, 작업 공간 폴더 경로는 모두 필수입니다.');
-        return;
-      }
-      try {
-        const res = await window.electronAPI.downloadPlugin({ 
-          downloadUrl, 
-          aliasName: name,
-          workspaceDir: pluginWorkspaceDir,
-          keywords: parsedKeywords // 💡 다운로드 플러그인용 동적 필터 키워드 주입
-        } as any); 
-        
-        if (res.success) {
-          setName(''); 
-          setDownloadUrl('');
-          setPluginWorkspaceDir('');
-          setKeywordsInput(''); // 초기화
-          setStatusMsg('외부 스크립트 다운로드 및 지정된 워킹 디렉토리 설정이 완료되었습니다!');
-          refreshPluginsList();
-        } else { 
-          setStatusMsg(`오류: ${res.error}`); 
-        }
-      } catch (err: any) { 
-        setStatusMsg(`시스템 오류: ${err.message}`); 
-      }
-      return;
-    }
+    const targetPlugin = installedPlugins.find(p => p.id === targetPluginId);
+    if (!targetPlugin) return;
 
-    // 분기 2. 로컬 자바스크립트 파일 연동 및 작업 폴더 지정 모드 (local)
-    if (pluginType === 'local') {
-      if (!customScriptPath || !name || !pluginWorkspaceDir) {
-        setStatusMsg('오류: 별칭, 스크립트 파일 경로, 작업 공간 폴더 경로는 모두 필수입니다.');
-        return;
-      }
-      
-      const config = {
-        id: `plugin-${Date.now()}`,
-        type: 'custom' as any, 
-        name,
-        enabled: true,
-        scriptPath: customScriptPath,     
-        workspaceDir: pluginWorkspaceDir,
-        keywords: parsedKeywords // 💡 로컬 경로 연결 플러그인용 동적 필터 키워드 주입
-      };
-      
-      try {
-        const res = await window.electronAPI.addMcpPlugin(config);
-        if (res.success) {
-          setName('');
-          setCustomScriptPath('');
-          setPluginWorkspaceDir('');
-          setKeywordsInput(''); // 초기화
-          setStatusMsg('로컬 스크립트 플러그인이 성공적으로 장착되었습니다.');
-          refreshPluginsList();
-        } else {
-          setStatusMsg(`오류: ${res.error}`);
-        }
-      } catch (err: any) {
-        setStatusMsg(`시스템 오류: ${err.message}`);
-      }
-      return;
-    }
-
-    // 분기 3. 원격 독립 엔드포인트 네트워크 연결 모드 (remote)
-    const config = {
-      id: `plugin-${Date.now()}`, 
-      type: pluginType as any, 
-      name, 
-      enabled: true,
-      url,
-      apiKey,
-      keywords: parsedKeywords // 💡 원격 서버 연동 플러그인용 동적 필터 키워드 주입
+    const updateConfig = {
+      id: targetPlugin.id,
+      type: targetPlugin.type,
+      name: name.trim(),
+      url: targetPlugin.url || targetPlugin.scriptPath,
+      apiKey: targetPlugin.apiKey,
+      workspaceDir: targetPlugin.workspaceDir,
+      keywords: parsedKeywords,
+      enabled: true
     };
-    try {
-      const res = await window.electronAPI.addMcpPlugin(config);
-      if (res.success) {
-        setName(''); setUrl(''); setApiKey('');
-        setKeywordsInput(''); // 초기화
-        setStatusMsg('성공적으로 추가되었습니다.');
-        refreshPluginsList();
-      } else { 
-        setStatusMsg(`오류: ${res.error}`); 
-      }
-    } catch (err: any) { 
-      setStatusMsg(`시스템 오류: ${err.message}`); 
+
+    const res = await window.electronAPI.addMcpPlugin(updateConfig as any);
+    if (res.success) {
+      setIsEditModalOpen(false);
+      setTargetPluginId(null);
+      setName('');
+      setKeywordsInput('');
+      refreshPluginsList();
+    } else {
+      alert(`정보 수정 실패: ${res.error}`);
     }
   };
 
-  // 플러그인 삭제 제어
+  const handleAddPlugin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatusMsg('초기화 중...');
+
+    const parsedKeywords = keywordsInput
+      ? keywordsInput.split(',').map(k => k.trim()).filter(Boolean)
+      : [];
+
+    if (pluginType === 'custom') {
+      if (!downloadUrl || !name || !pluginWorkspaceDir) { setStatusMsg('오류: 모든 값을 기입해 주세요.'); return; }
+      try {
+        const res = await window.electronAPI.downloadPlugin({ downloadUrl, aliasName: name, workspaceDir: pluginWorkspaceDir, keywords: parsedKeywords } as any); 
+        if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
+      } catch (err: any) { setStatusMsg(`시스템 오류: ${err.message}`); }
+      return;
+    }
+
+    if (pluginType === 'local') {
+      if (!customScriptPath || !name || !pluginWorkspaceDir) { setStatusMsg('오류: 모든 값을 기입해 주세요.'); return; }
+      const config = { id: `plugin-${Date.now()}`, type: 'custom' as any, name, enabled: true, scriptPath: customScriptPath, workspaceDir: pluginWorkspaceDir, keywords: parsedKeywords };
+      try {
+        const res = await window.electronAPI.addMcpPlugin(config);
+        if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
+      } catch (err: any) { setStatusMsg(`시스템 오류: ${err.message}`); }
+      return;
+    }
+
+    const config = { id: `plugin-${Date.now()}`, type: pluginType as any, name, enabled: true, url, apiKey, keywords: parsedKeywords };
+    try {
+      const res = await window.electronAPI.addMcpPlugin(config);
+      if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
+    } catch (err: any) { setStatusMsg(`시스템 오류: ${err.message}`); }
+  };
+
+  const resetForm = () => {
+    setName(''); setUrl(''); setApiKey(''); setDownloadUrl('');
+    setCustomScriptPath(''); setPluginWorkspaceDir(''); setKeywordsInput('');
+    setStatusMsg(''); setIsAddModalOpen(false);
+  };
+
   const handleRemovePlugin = async (id: string, pluginName: string) => {
-    if (!confirm(`[${pluginName}] 플러그인을 삭제하시겠습니까?`)) return;
+    setMenuOpenPluginId(null);
+    if (!confirm(`[${pluginName}] 플러그인을 제거하시겠습니까?`)) return;
     const res = await window.electronAPI.removeMcpPlugin(id);
     if (res.success) refreshPluginsList();
   };
 
-  // 🤍 화이트 글래스모피즘 아크릴 카드 공통 스타일
-  const glassCardStyle: React.CSSProperties = {
-    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.2) 100%)',
-    backdropFilter: 'blur(30px)', 
-    WebkitBackdropFilter: 'blur(30px)', 
-    padding: '28px', 
-    borderRadius: '16px', 
-    border: '1px solid rgba(0, 0, 0, 0.08)', 
-    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.04)', 
-    boxSizing: 'border-box'
-  };
-
-  // 🤍 고대비 입력 폼 필드 스타일
   const inputStyle: React.CSSProperties = {
-    width: '100%', 
-    padding: '12px', 
-    borderRadius: '10px', 
-    border: '1px solid rgba(0, 0, 0, 0.15)', 
-    backgroundColor: 'rgba(255, 255, 255, 0.75)', 
-    color: '#111111', 
-    fontWeight: 500, 
-    fontSize: '0.92rem', 
-    outline: 'none', 
-    marginTop: '8px', 
-    boxSizing: 'border-box'
+    width: '100%', padding: '10px 12px', borderRadius: '8px',
+    border: '1px solid rgba(0, 0, 0, 0.12)', backgroundColor: '#FFFFFF',
+    color: '#111111', fontWeight: 500, fontSize: '0.9rem', outline: 'none',
+    marginTop: '6px', boxSizing: 'border-box'
   };
 
-  const labelStyle: React.CSSProperties = { fontSize: '0.85rem', fontWeight: 700, color: '#4E4E5A' };
+  const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: '#4E4E5A' };
 
   return (
     <div style={{ width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'transparent', boxSizing: 'border-box' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: '40px', boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: '840px', margin: '0 auto', padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box' }}>
         
-        {/* 1. MCP 플러그인 추가 섹션 */}
-        <section style={glassCardStyle}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '4px', color: '#2D2D35', marginTop: 0 }}>Add MCP Plugin</h2>
-          <p style={{ fontSize: '0.85rem', color: '#6E6E7A', marginBottom: '24px' }}>새로운 자원 조작 플러그인을 에코시스템에 마운트합니다.</p>
+        {/* 대시보드 상단 바 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2D2D35', margin: 0, letterSpacing: '-0.02em' }}>MCP Ecosystem</h1>
+            <p style={{ fontSize: '0.85rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>컨텍스트 기반으로 자동 연동되는 외부 도구 플러그인 레지스트리</p>
+          </div>
           
-          <form onSubmit={handleAddPlugin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* 기본 정보 설정 그리드 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              <div>
-                <div style={labelStyle}>Plugin Type</div>
-                <select value={pluginType} onChange={(e) => setPluginType(e.target.value as any)} style={inputStyle}>
-                  <option value="remote" style={{ backgroundColor: '#F4F4F6', color: '#111' }}>Remote Endpoint (URL)</option>
-                  <option value="custom" style={{ backgroundColor: '#F4F4F6', color: '#111' }}>Download Script (.js URL)</option>
-                  <option value="local" style={{ backgroundColor: '#F4F4F6', color: '#111' }}>Local Script File (.js Local)</option>
-                </select>
-              </div>
-              <div>
-                <div style={labelStyle}>Plugin Alias</div>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="별칭 입력" required style={inputStyle} />
-              </div>
-            </div>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px',
+              background: '#2D2D35', color: '#FFFFFF', border: 'none', borderRadius: '10px',
+              fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.15s',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+            }}
+          >
+            <Icon.Plus /> Add Plugin
+          </button>
+        </div>
 
-            {/* 💡 [UI 확장] 모든 플러그인이 가동 문맥을 판단할 트리거 키워드 입력 필드 전면 배치 */}
-            <div>
-              <div style={labelStyle}>Trigger Keywords (쉼표로 구분)</div>
-              <input 
-                type="text" 
-                value={keywordsInput} 
-                onChange={e => setKeywordsInput(e.target.value)} 
-                placeholder="AI 대화 내용 중 매칭할 트리거 단어를 적어주세요 (예: 파일,메모,로그,텍스트)" 
-                style={inputStyle} 
-              />
+        {/* 그리드 카드 목록 영역 */}
+        <section style={{ marginTop: '8px' }}>
+          {installedPlugins.length === 0 ? (
+            <div style={{ 
+              padding: '60px 20px', textAlign: 'center', color: '#6E6E7A', fontSize: '0.9rem', fontWeight: 500,
+              background: 'rgba(255,255,255,0.4)', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)', backdropFilter: 'blur(20px)'
+            }}>
+              🔌 장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
             </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {installedPlugins.map((p) => {
+                const isRemote = p.type === 'remote';
+                const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
+                
+                return (
+                  // 💡 개별 카드 박스입니다. `position: 'relative'`가 기준점 역할을 합니다.
+                  <div 
+                    key={p.id}
+                    onMouseEnter={() => setHoveredPluginId(p.id)}
+                    onMouseLeave={() => setHoveredPluginId(null)}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.4) 100%)',
+                      backdropFilter: 'blur(20px)', border: '1px solid rgba(0, 0, 0, 0.08)',
+                      borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
+                      gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
+                      height: '135px', boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
+                        <span style={{ color: '#4E4E5A', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
+                          {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
+                        </span>
+                        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: '#2D2D35' }}>{p.name}</span>
+                      </div>
+                      <span style={{ 
+                        fontSize: '0.68rem', padding: '3px 8px', borderRadius: '6px', 
+                        backgroundColor: isRemote ? 'rgba(0, 0, 0, 0.04)' : 'rgba(217, 119, 6, 0.08)', 
+                        border: isRemote ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid rgba(217, 119, 6, 0.15)', 
+                        color: isRemote ? '#2D2D35' : '#d97706', fontWeight: 800, textTransform: 'uppercase'
+                      }}>
+                        {p.type}
+                      </span>
+                    </div>
 
-            {pluginType === 'remote' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div>
-                  <div style={labelStyle}>Endpoint URL</div>
-                  <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="http://..." required style={inputStyle} />
-                </div>
-                <div>
-                  <div style={labelStyle}>Security Token</div>
-                  <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API Key" required style={inputStyle} />
-                </div>
+                    <div style={{ flexGrow: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9E9EAF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {isRemote ? 'Endpoint Connection' : 'Local Workspace'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.82rem', color: '#4E4E5A', fontFamily: 'monospace', 
+                        marginTop: '2px', wordBreak: 'break-all', whiteSpace: 'nowrap', 
+                        overflow: 'hidden', textOverflow: 'ellipsis' 
+                      }} title={isRemote ? p.url : p.workspaceDir}>
+                        {isRemote ? p.url : p.workspaceDir}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '8px' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#6E6E7A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                        {hasKeywords ? `🎯 키워드: ${p.keywords}` : '🔓 상시 대기조'}
+                      </div>
+                    </div>
+
+                    {/* 더보기 버튼 */}
+                    {(hoveredPluginId === p.id || menuOpenPluginId === p.id) && (
+                      <button
+                        onClick={(e) => handleOpenMenu(e, p.id)}
+                        style={{
+                          position: 'absolute', bottom: '12px', right: '14px',
+                          background: 'transparent', border: 'none',
+                          color: menuOpenPluginId === p.id ? '#2D2D35' : '#9E9EAF', 
+                          cursor: 'pointer', padding: '4px', borderRadius: '4px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          zIndex: 10
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <Icon.More />
+                      </button>
+                    )}
+
+                    {/* ── 💡 [최종 해결 완료] 카드 내부 탑치형 absolute 드롭다운 상자 선언 ── */}
+                    {/* 카드박스 우측 하단 여백 기준으로 고정시켜 1열이든 2열이든 오차 없이 칼안착됩니다. */}
+                    {menuOpenPluginId === p.id && (
+                      <div
+                        ref={menuRef}
+                        style={{
+                          position: 'absolute',
+                          bottom: '38px', // 더보기 단추 바로 윗부분으로 우아하게 마운트
+                          right: '14px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                          backdropFilter: 'blur(20px)',
+                          border: '1px solid rgba(0, 0, 0, 0.12)', 
+                          borderRadius: '10px',
+                          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', 
+                          padding: '4px', 
+                          zIndex: 9999,
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '1px', 
+                          width: '120px',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => handleStartEditModal(p.id, p.name, p.keywords)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+                            border: 'none', background: 'transparent', borderRadius: '6px',
+                            fontSize: '0.78rem', fontWeight: 500, color: '#2D2D35', cursor: 'pointer',
+                            textAlign: 'left', width: '100%'
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)')}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          <Icon.Edit /> 플러그인 수정
+                        </button>
+                        <button
+                          onClick={() => handleRemovePlugin(p.id, p.name)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+                            border: 'none', background: 'transparent', borderRadius: '6px',
+                            fontSize: '0.78rem', fontWeight: 500, color: '#ef4444', cursor: 'pointer',
+                            textAlign: 'left', width: '100%'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <Icon.Trash /> 삭제하기
+                        </button>
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* 플러그인 신규 생성 등록 모달 팝업 */}
+        {isAddModalOpen && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(15px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
+          }} onClick={resetForm}>
+            <div style={{
+              width: '460px', padding: '24px', borderRadius: '18px',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 250, 0.95) 100%)',
+              border: '1px solid rgba(0, 0, 0, 0.12)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.18)',
+              display: 'flex', flexDirection: 'column', gap: '16px'
+            }} onClick={e => e.stopPropagation()}>
+              
+              <div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2D2D35' }}>플러그인 추가 등록</div>
+                <p style={{ fontSize: '0.8rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>유형을 선택하고 필요한 리소스를 주입하세요.</p>
               </div>
-            ) : pluginType === 'custom' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <div style={labelStyle}>Plugin Download URL</div>
-                  <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../plugin.js" required style={inputStyle} />
-                </div>
-                <div>
-                  <div style={labelStyle}>Plugin Working Directory (Target Workspace)</div>
-                  <input 
-                    type="text" 
-                    value={pluginWorkspaceDir} 
-                    onChange={e => setPluginWorkspaceDir(e.target.value)} 
-                    placeholder="다운로드된 플러그인이 파일 작업을 수행할 폴더 경로 (예: /Users/oxxultus/mcp-download-space)" 
-                    required 
-                    style={inputStyle} 
-                  />
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <div style={labelStyle}>Absolute JavaScript File Path</div>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                    <input 
-                      type="text" 
-                      value={customScriptPath} 
-                      onChange={e => setCustomScriptPath(e.target.value)} 
-                      placeholder="예시: /Users/oxxultus/dev/my-mcp-tool.js" 
-                      required 
-                      style={{ ...inputStyle, flexGrow: 1 }} 
-                    />
-                    <button type="button" onClick={handleSelectFile} style={{ padding: '12px 20px', background: '#E3E1D9', border: '1px solid rgba(0,0,0,0.15)', color: '#2D2D35', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      파일 선택
-                    </button>
+
+              <form onSubmit={handleAddPlugin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <div style={labelStyle}>Plugin Type</div>
+                    <select value={pluginType} onChange={(e) => setPluginType(e.target.value as any)} style={inputStyle}>
+                      <option value="remote">Remote Endpoint</option>
+                      <option value="custom">Download Script</option>
+                      <option value="local">Local Script File</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div style={labelStyle}>Plugin Alias</div>
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: 파일매니저" required style={inputStyle} />
                   </div>
                 </div>
 
                 <div>
-                  <div style={labelStyle}>Plugin Working Directory (Target Workspace)</div>
-                  <input 
-                    type="text" 
-                    value={pluginWorkspaceDir} 
-                    onChange={e => setPluginWorkspaceDir(e.target.value)} 
-                    placeholder="플러그인이 실제로 파일 작업을 수행할 폴더 경로를 입력하세요. (예: /Users/oxxultus/mcp-workspace)" 
-                    required 
-                    style={inputStyle} 
-                  />
+                  <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
+                  <input type="text" value={keywordsInput} onChange={e => setKeywordsInput(e.target.value)} placeholder="예: 파일,메모,로그 (미입력 시 상시 대기)" style={inputStyle} />
                 </div>
-              </div>
-            )}
-            
-            <button type="submit" style={{ padding: '12px 24px', background: '#2D2D35', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '0.92rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', marginTop: '8px' }}>
-              {pluginType === 'local' ? 'Link & Activate Plugin' : 'Activate Plugin'}
-            </button>
-            {statusMsg && <div style={{ fontSize: '#0.88rem', color: '#d97706', fontWeight: 600, marginTop: '4px' }}>{statusMsg}</div>}
-          </form>
-        </section>
 
-        {/* 2. Active Plugins 리스트 세션 */}
-        <section style={{ ...glassCardStyle, padding: '24px' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.03em', marginBottom: '16px', color: '#2D2D35', marginTop: 0 }}>Active Plugins</h2>
-          <div style={{ border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '12px', overflowX: 'auto', backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>
-            {installedPlugins.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6E6E7A', fontSize: '0.9rem', fontWeight: 500 }}>장착된 플러그인이 없습니다.</div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', tableLayout: 'fixed' }}>
-                <thead style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', color: '#4E4E5A' }}>
-                  <tr>
-                    <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, width: '20%' }}>Name</th>
-                    <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, width: '15%' }}>Type</th>
-                    <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, width: '50%' }}>Script File Path / Info</th>
-                    <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 700, width: '15%' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody style={{ color: '#111111', fontWeight: 500 }}>
-                  {installedPlugins.map((p) => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
-                      <td style={{ padding: '14px 16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ 
-                          fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', 
-                          backgroundColor: p.type === 'custom' ? 'rgba(217, 119, 6, 0.1)' : 'rgba(0, 0, 0, 0.05)', 
-                          border: p.type === 'custom' ? '1px solid rgba(217, 119, 6, 0.2)' : '1px solid rgba(0, 0, 0, 0.05)', 
-                          color: p.type === 'custom' ? '#d97706' : '#2D2D35', fontWeight: 700 
-                        }}>
-                          {p.type.toUpperCase()}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', color: '#4E4E5A', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                        {p.type === 'remote' ? p.url : p.workspaceDir}
-                      </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                        <button onClick={() => handleRemovePlugin(p.id, p.name)} style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.88rem', cursor: 'pointer', fontWeight: 700 }}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                {pluginType === 'remote' ? (
+                  <>
+                    <div>
+                      <div style={labelStyle}>Endpoint URL</div>
+                      <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="http://localhost:8080/mcp" required style={inputStyle} />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Security Token</div>
+                      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API 키 보안 토큰" required style={inputStyle} />
+                    </div>
+                  </>
+                ) : pluginType === 'custom' ? (
+                  <>
+                    <div>
+                      <div style={labelStyle}>Plugin Download URL</div>
+                      <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../tool.js" required style={inputStyle} />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Target Workspace Path</div>
+                      <input type="text" value={pluginWorkspaceDir} onChange={e => setPluginWorkspaceDir(e.target.value)} placeholder="파일 작업 전용 디렉토리 절대경로" required style={inputStyle} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <div style={labelStyle}>JavaScript File Path</div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                        <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
+                        <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', color: '#2D2D35', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                          파일 탐색
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Target Workspace Path</div>
+                      <input type="text" value={pluginWorkspaceDir} onChange={e => setPluginWorkspaceDir(e.target.value)} placeholder="실제 파일 연동이 일어날 빈 작업 폴더 경로" required style={inputStyle} />
+                    </div>
+                  </>
+                )}
+
+                {statusMsg && <div style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 600 }}>{statusMsg}</div>}
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                  <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(0,0,0,0.05)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer' }}>
+                    취소
+                  </button>
+                  <button type="submit" style={{ padding: '9px 16px', border: 'none', background: '#2D2D35', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#FFFFFF', cursor: 'pointer' }}>
+                    {pluginType === 'local' ? 'Link & Activate' : 'Activate'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </section>
+        )}
+
+        {/* 플러그인 별칭 및 키워드 동시 수정 모달 팝업 레이어 */}
+        {isEditModalOpen && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
+          }} onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); }}>
+            <div style={{
+              width: '360px', padding: '24px', borderRadius: '16px',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 250, 0.95) 100%)',
+              border: '1px solid rgba(0, 0, 0, 0.15)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
+              display: 'flex', flexDirection: 'column', gap: '16px'
+            }} onClick={e => e.stopPropagation()}>
+              
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2D2D35' }}>플러그인 정보 수정</div>
+                <p style={{ fontSize: '0.78rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>별칭 이름과 트리거 컨텍스트 필터를 수정합니다.</p>
+              </div>
+
+              <div>
+                <div style={labelStyle}>Plugin Alias</div>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="새로운 플러그인 별칭 이름"
+                  autoFocus
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
+                <input
+                  type="text"
+                  value={keywordsInput}
+                  onChange={e => setKeywordsInput(e.target.value)}
+                  placeholder="예: 파일,메모,백업 (비워두면 상시 가동)"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEditPopup();
+                    if (e.key === 'Escape') { setIsEditModalOpen(false); setTargetPluginId(null); }
+                  }}
+                  style={inputStyle}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); }}
+                  style={{ padding: '8px 14px', border: 'none', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer' }}
+                >취소</button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditPopup}
+                  disabled={!name.trim()}
+                  style={{ 
+                    padding: '8px 14px', border: 'none', background: '#2D2D35', borderRadius: '6px', 
+                    fontSize: '0.82rem', fontWeight: 600, color: '#FFFFFF', 
+                    cursor: name.trim() ? 'pointer' : 'not-allowed', opacity: name.trim() ? 1 : 0.5 
+                  }}
+                >저장</button>
+              </div>
+
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

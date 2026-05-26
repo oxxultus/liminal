@@ -39,3 +39,9 @@ declare global {
     electronAPI: IElectronAPI;
   }
 }
+
+declare module 'react' {
+  interface CSSProperties {
+    WebkitAppRegion?: 'drag' | 'no-drag';
+  }
+}
