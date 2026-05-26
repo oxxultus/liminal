@@ -1,0 +1,44 @@
+{
+  "name": "mcp-client-electron",
+  "version": "1.0.0",
+  "description": "MCP Universal LLM Client with Electron & React",
+  "main": "dist/main/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev:renderer": "vite",
+    "dev:main": "tsup src/main/main.ts src/main/preload.ts --out-dir dist/main --watch --external electron --onSuccess \"electron .\"",
+    "dev": "concurrently \"npm run dev:renderer\" \"cross-env NODE_ENV=development npm run dev:main\"",
+    "build:renderer": "vite build",
+    "build:main": "tsup src/main/main.ts src/main/preload.ts --out-dir dist/main --minify --external electron",
+    "build": "npm run build:renderer && npm run build:main",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
+    "@google/genai": "^2.6.0",
+    "axios": "^1.16.1",
+    "openai": "^6.39.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14",
+    "vls": "^0.8.5"
+  }
+}

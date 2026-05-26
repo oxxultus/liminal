@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko" style="overflow: hidden; margin: 0; padding: 0; width: 100%; height: 100%;">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:5173 ws://localhost:5173; style-src 'self' 'unsafe-inline';" />
+
+    <title>MCP Universal LLM Client</title>
+    <style>
+      /* 우측 흰색 유령 스크롤바 바디 영역 완전 소멸 */
+      ::-webkit-scrollbar {
+        display: none !important;
+        width: 0px !important;
+        height: 0px !important;
+      }
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+        /* 파란색 계열 그라데이션 바탕 유지 */
+        background: linear-gradient(135deg, #0d1b3e 0%, #1e3a8a 40%, #081229 100%) !important;
+      }
+    </style>
+  </head>
+  <body style="overflow: hidden; margin: 0; padding: 0; background: transparent;">
+    <div id="root" style="width: 100%; height: 100%; overflow: hidden;"></div>
+    
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
