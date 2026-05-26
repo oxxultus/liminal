@@ -87,7 +87,6 @@ export default function PluginsView() {
     } catch (err: any) { alert(`파일 선택 실패: ${err.message}`); }
   };
 
-  // 💡 [초소형화] 이제 스크롤/화면 좌표를 계산하지 않고 상태값만 스위칭합니다!
   const handleOpenMenu = (e: React.MouseEvent, pluginId: string) => {
     e.stopPropagation();
     if (menuOpenPluginId === pluginId) {
@@ -187,31 +186,42 @@ export default function PluginsView() {
     if (res.success) refreshPluginsList();
   };
 
+  // 💡 [테마 치환] 하드코딩된 변수들을 CSS 변수형 명세로 교체합니다.
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 12px', borderRadius: '8px',
-    border: '1px solid rgba(0, 0, 0, 0.12)', backgroundColor: '#FFFFFF',
-    color: '#111111', fontWeight: 500, fontSize: '0.9rem', outline: 'none',
+    border: '1px solid var(--border-glass-input)',  // ← 수정
+    color: 'var(--color-text-main)', fontWeight: 500, fontSize: '0.9rem', outline: 'none',
     marginTop: '6px', boxSizing: 'border-box'
   };
 
-  const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: '#4E4E5A' };
+  const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' };
+
+  const getBadgeTypeStyle = (type: string) => {
+    const isCustom = type === 'custom';
+    return {
+      fontSize: '0.68rem', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, textTransform: 'uppercase' as const,
+      backgroundColor: isCustom ? 'rgba(217, 119, 6, 0.12)' : 'rgba(128, 128, 128, 0.12)',
+      border: isCustom ? '1px solid rgba(217, 119, 6, 0.25)' : '1px solid rgba(128, 128, 128, 0.2)',
+      color: isCustom ? '#f59e0b' : 'var(--color-text-main)'
+    };
+  };
 
   return (
     <div style={{ width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'transparent', boxSizing: 'border-box' }}>
       <div style={{ maxWidth: '840px', margin: '0 auto', padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box' }}>
         
         {/* 대시보드 상단 바 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '16px' }}>
           <div>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2D2D35', margin: 0, letterSpacing: '-0.02em' }}>MCP Ecosystem</h1>
-            <p style={{ fontSize: '0.85rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>컨텍스트 기반으로 자동 연동되는 외부 도구 플러그인 레지스트리</p>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-text-main)', margin: 0, letterSpacing: '-0.02em' }}>MCP Ecosystem</h1>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>컨텍스트 기반으로 자동 연동되는 외부 도구 플러그인 레지스트리</p>
           </div>
           
           <button
             onClick={() => setIsAddModalOpen(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px',
-              background: '#2D2D35', color: '#FFFFFF', border: 'none', borderRadius: '10px',
+              background: 'var(--color-text-main)', color: 'var(--color-btn-text)', border: 'none', borderRadius: '10px',
               fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.15s',
               boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
             }}
@@ -224,8 +234,8 @@ export default function PluginsView() {
         <section style={{ marginTop: '8px' }}>
           {installedPlugins.length === 0 ? (
             <div style={{ 
-              padding: '60px 20px', textAlign: 'center', color: '#6E6E7A', fontSize: '0.9rem', fontWeight: 500,
-              background: 'rgba(255,255,255,0.4)', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)', backdropFilter: 'blur(20px)'
+              padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem', fontWeight: 500,
+              background: 'var(--bg-glass-card)', borderRadius: '16px', border: 'var(--border-glass)'
             }}>
               🔌 장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
             </div>
@@ -236,14 +246,12 @@ export default function PluginsView() {
                 const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
                 
                 return (
-                  // 💡 개별 카드 박스입니다. `position: 'relative'`가 기준점 역할을 합니다.
                   <div 
                     key={p.id}
                     onMouseEnter={() => setHoveredPluginId(p.id)}
                     onMouseLeave={() => setHoveredPluginId(null)}
                     style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.4) 100%)',
-                      backdropFilter: 'blur(20px)', border: '1px solid rgba(0, 0, 0, 0.08)',
+                      background: 'var(--bg-glass-card)', border: 'var(--border-glass)',
                       borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
                       gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
                       height: '135px', boxSizing: 'border-box'
@@ -251,27 +259,22 @@ export default function PluginsView() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
-                        <span style={{ color: '#4E4E5A', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--color-text-muted)', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
                           {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
                         </span>
-                        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: '#2D2D35' }}>{p.name}</span>
+                        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)' }}>{p.name}</span>
                       </div>
-                      <span style={{ 
-                        fontSize: '0.68rem', padding: '3px 8px', borderRadius: '6px', 
-                        backgroundColor: isRemote ? 'rgba(0, 0, 0, 0.04)' : 'rgba(217, 119, 6, 0.08)', 
-                        border: isRemote ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid rgba(217, 119, 6, 0.15)', 
-                        color: isRemote ? '#2D2D35' : '#d97706', fontWeight: 800, textTransform: 'uppercase'
-                      }}>
+                      <span style={getBadgeTypeStyle(p.type)}>
                         {p.type}
                       </span>
                     </div>
 
                     <div style={{ flexGrow: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9E9EAF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {isRemote ? 'Endpoint Connection' : 'Local Workspace'}
                       </div>
                       <div style={{ 
-                        fontSize: '0.82rem', color: '#4E4E5A', fontFamily: 'monospace', 
+                        fontSize: '0.82rem', color: 'var(--color-text-main)', fontFamily: 'monospace', 
                         marginTop: '2px', wordBreak: 'break-all', whiteSpace: 'nowrap', 
                         overflow: 'hidden', textOverflow: 'ellipsis' 
                       }} title={isRemote ? p.url : p.workspaceDir}>
@@ -279,8 +282,8 @@ export default function PluginsView() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '8px' }}>
-                      <div style={{ fontSize: '0.78rem', color: '#6E6E7A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
                         {hasKeywords ? `🎯 키워드: ${p.keywords}` : '🔓 상시 대기조'}
                       </div>
                     </div>
@@ -292,38 +295,28 @@ export default function PluginsView() {
                         style={{
                           position: 'absolute', bottom: '12px', right: '14px',
                           background: 'transparent', border: 'none',
-                          color: menuOpenPluginId === p.id ? '#2D2D35' : '#9E9EAF', 
+                          color: menuOpenPluginId === p.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
                           cursor: 'pointer', padding: '4px', borderRadius: '4px',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           zIndex: 10
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)')}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
                         onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         <Icon.More />
                       </button>
                     )}
 
-                    {/* ── 💡 [최종 해결 완료] 카드 내부 탑치형 absolute 드롭다운 상자 선언 ── */}
-                    {/* 카드박스 우측 하단 여백 기준으로 고정시켜 1열이든 2열이든 오차 없이 칼안착됩니다. */}
+                    {/* 카드 내부 귀속형 absolute 드롭다운 상자 선언 */}
                     {menuOpenPluginId === p.id && (
                       <div
                         ref={menuRef}
                         style={{
-                          position: 'absolute',
-                          bottom: '38px', // 더보기 단추 바로 윗부분으로 우아하게 마운트
-                          right: '14px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.98)', 
-                          backdropFilter: 'blur(20px)',
-                          border: '1px solid rgba(0, 0, 0, 0.12)', 
-                          borderRadius: '10px',
-                          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', 
-                          padding: '4px', 
-                          zIndex: 9999,
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: '1px', 
-                          width: '120px',
+                          position: 'absolute', bottom: '38px', right: '14px',
+                          backgroundColor: 'var(--bg-bubble-bot)', backdropFilter: 'blur(20px)',
+                          border: 'var(--border-glass)', borderRadius: '10px',
+                          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)', padding: '4px', zIndex: 9999,
+                          display: 'flex', flexDirection: 'column', gap: '1px', width: '120px',
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -332,10 +325,10 @@ export default function PluginsView() {
                           style={{
                             display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
                             border: 'none', background: 'transparent', borderRadius: '6px',
-                            fontSize: '0.78rem', fontWeight: 500, color: '#2D2D35', cursor: 'pointer',
+                            fontSize: '0.78rem', fontWeight: 500, color: 'var(--color-text-main)', cursor: 'pointer',
                             textAlign: 'left', width: '100%'
                           }}
-                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)')}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
                           onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
                           <Icon.Edit /> 플러그인 수정
@@ -367,19 +360,19 @@ export default function PluginsView() {
         {isAddModalOpen && (
           <div style={{
             position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(15px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(15px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
           }} onClick={resetForm}>
             <div style={{
               width: '460px', padding: '24px', borderRadius: '18px',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 250, 0.95) 100%)',
-              border: '1px solid rgba(0, 0, 0, 0.12)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.18)',
+              background: 'var(--bg-modal)',
+              border: 'var(--border-glass)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.2)',
               display: 'flex', flexDirection: 'column', gap: '16px'
             }} onClick={e => e.stopPropagation()}>
               
               <div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2D2D35' }}>플러그인 추가 등록</div>
-                <p style={{ fontSize: '0.8rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>유형을 선택하고 필요한 리소스를 주입하세요.</p>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>플러그인 추가 등록</div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>유형을 선택하고 필요한 리소스를 주입하세요.</p>
               </div>
 
               <form onSubmit={handleAddPlugin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -387,9 +380,9 @@ export default function PluginsView() {
                   <div>
                     <div style={labelStyle}>Plugin Type</div>
                     <select value={pluginType} onChange={(e) => setPluginType(e.target.value as any)} style={inputStyle}>
-                      <option value="remote">Remote Endpoint</option>
-                      <option value="custom">Download Script</option>
-                      <option value="local">Local Script File</option>
+                      <option value="remote" style={{ background: 'var(--bg-input)' }}>Remote Endpoint</option>
+                      <option value="custom" style={{ background: 'var(--bg-input)' }}>Download Script</option>
+                      <option value="local" style={{ background: 'var(--bg-input)' }}>Local Script File</option>
                     </select>
                   </div>
                   <div>
@@ -431,7 +424,7 @@ export default function PluginsView() {
                       <div style={labelStyle}>JavaScript File Path</div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                         <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
-                        <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', color: '#2D2D35', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                        <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(128,128,128,0.1)', border: '1px solid rgba(128,128,128,0.15)', color: 'var(--color-text-main)', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
                           파일 탐색
                         </button>
                       </div>
@@ -446,10 +439,10 @@ export default function PluginsView() {
                 {statusMsg && <div style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 600 }}>{statusMsg}</div>}
 
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
-                  <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(0,0,0,0.05)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer' }}>
+                  <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                     취소
                   </button>
-                  <button type="submit" style={{ padding: '9px 16px', border: 'none', background: '#2D2D35', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#FFFFFF', cursor: 'pointer' }}>
+                  <button type="submit" style={{ padding: '9px 16px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
                     {pluginType === 'local' ? 'Link & Activate' : 'Activate'}
                   </button>
                 </div>
@@ -462,19 +455,19 @@ export default function PluginsView() {
         {isEditModalOpen && (
           <div style={{
             position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(10px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(10px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
           }} onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); }}>
             <div style={{
               width: '360px', padding: '24px', borderRadius: '16px',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 250, 0.95) 100%)',
-              border: '1px solid rgba(0, 0, 0, 0.15)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
+              background: 'var(--bg-modal)',
+              border: 'var(--border-glass)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
               display: 'flex', flexDirection: 'column', gap: '16px'
             }} onClick={e => e.stopPropagation()}>
               
               <div>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2D2D35' }}>플러그인 정보 수정</div>
-                <p style={{ fontSize: '0.78rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>별칭 이름과 트리거 컨텍스트 필터를 수정합니다.</p>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>플러그인 정보 수정</div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>별칭 이름과 트리거 컨텍스트 필터를 수정합니다.</p>
               </div>
 
               <div>
@@ -508,15 +501,15 @@ export default function PluginsView() {
                 <button
                   type="button"
                   onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); }}
-                  style={{ padding: '8px 14px', border: 'none', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer' }}
+                  style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}
                 >취소</button>
                 <button
                   type="button"
                   onClick={handleSaveEditPopup}
                   disabled={!name.trim()}
                   style={{ 
-                    padding: '8px 14px', border: 'none', background: '#2D2D35', borderRadius: '6px', 
-                    fontSize: '0.82rem', fontWeight: 600, color: '#FFFFFF', 
+                    padding: '8px 14px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '6px', 
+                    fontSize: '0.82rem', fontWeight: 600, 
                     cursor: name.trim() ? 'pointer' : 'not-allowed', opacity: name.trim() ? 1 : 0.5 
                   }}
                 >저장</button>

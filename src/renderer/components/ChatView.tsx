@@ -2,18 +2,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EngineConfig } from '../App';
 
-// 💡 마크다운 파싱 및 문법 하이라이팅 컴포넌트 임포트
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+// 💡 다크 모드와 라이트 모드 코드창의 명도 대비를 위해 두 테마를 모두 임포트합니다.
+import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface ChatViewProps {
   engines: EngineConfig[];
   activeEngine: EngineConfig;
   onProviderChange: (id: string) => void;
   sessionId: string;
-  // 💡 [예외 처리 추가] 수동 변경 여부 감지를 위해 현재 방의 제목(currentTitle)을 주입받습니다.
   currentTitle?: string; 
   onTitleUpdate: (sessionId: string, newTitle: string) => void;
 }
@@ -53,6 +52,9 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isSummarizing, setIsSummarizing] = useState(false);
 
+  // 💡 실시간 코드창 테마 스위칭을 위해 렌더러단의 다크모드 활성화 상태를 감지합니다.
+  const [isDark, setIsDark] = useState(() => document.documentElement.getAttribute('data-theme') === 'dark');
+
   // 슬래시 커맨드 관련 state
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
@@ -65,7 +67,16 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     c.command.includes(slashFilter.toLowerCase())
   );
 
-  // ── 세션 변경 시 히스토리 + 요약본 로드 ──
+  // 전역 DOM의 테마 가동 스위치 변경 리스너 바인딩
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  // 세션 변경 시 히스토리 + 요약본 로드
   useEffect(() => {
     const loadHistory = async () => {
       setIsLoadingHistory(true);
@@ -316,7 +327,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
-  // ── 비동기 제어권 위임 및 완벽 보장형 전송 함수 ──
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     if (input.startsWith('/')) {
@@ -330,9 +340,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
 
     const userText = input.trim();
     
-    // 💡 [2중 예외 방어 메커니즘 가동]
-    // 1) 기존 대화 내역에 유저 메시지가 없고
-    // 2) 현재 룸의 상태가 유저가 가공하지 않은 순수 기본 명세('새 채팅') 상태일 때만 자동 타이틀 승인!
     const isFirstUserMessage = !apiConversation.some(m => m.role === 'user');
     const isDefaultTitle = currentTitle === '새 채팅'; 
     const shouldUpdateTitle = isFirstUserMessage && isDefaultTitle;
@@ -343,8 +350,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
 
     try {
       await saveMessage('user', userText);
-      
-      // 💡 두 조건이 완벽히 합치될 때만 첫 입력 자동 요약 타이틀 가동
       if (shouldUpdateTitle) {
         await updateSessionTitle(userText);
       }
@@ -397,7 +402,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
 
       {/* 요약 진행 배너 */}
       {isSummarizing && (
-        <div style={{ padding: '10px 20px', textAlign: 'center', background: 'rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', fontSize: '0.8rem', color: '#1A1A1E', fontWeight: 600 }}>
+        <div style={{ padding: '10px 20px', textAlign: 'center', background: 'rgba(128, 128, 128, 0.08)', borderBottom: '1px solid rgba(128,128,128,0.15)', fontSize: '0.8rem', color: 'var(--color-text-main)', fontWeight: 600 }}>
           ✦ 대화 내용을 요약하는 중입니다...
         </div>
       )}
@@ -405,14 +410,14 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
       {/* 메시지 목록 피드 */}
       <div style={{ flexGrow: 1, width: '100%', padding: '30px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
         {isLoadingHistory ? (
-          <div style={{ color: '#4E4E5A', fontSize: '0.9rem', marginTop: '40px', fontWeight: 500 }}>대화 기록 불러오는 중...</div>
+          <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '40px', fontWeight: 500 }}>대화 기록 불러오는 중...</div>
         ) : (
           <div style={{ width: '100%', maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {messages.map((msg) => {
               const isUser = msg.sender === 'user';
               
               if (msg.sender === 'system') return (
-                <div key={msg.id} style={{ alignSelf: 'center', fontSize: '0.85rem', color: '#1A1A1E', fontWeight: 600, padding: '10px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(0, 0, 0, 0.03)', whiteSpace: 'pre-wrap', maxWidth: '90%', lineHeight: 1.6 }}>
+                <div key={msg.id} style={{ alignSelf: 'center', fontSize: '0.85rem', color: 'var(--color-text-main)', fontWeight: 600, padding: '10px 16px', borderRadius: '12px', border: 'var(--border-glass)', background: 'rgba(128,128,128,0.06)', whiteSpace: 'pre-wrap', maxWidth: '90%', lineHeight: 1.6 }}>
                   {msg.text}
                 </div>
               );
@@ -420,7 +425,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
               return (
                 <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
                   {!isUser && (
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#4E4E5A', padding: '0 4px', marginBottom: '2px', letterSpacing: '0.02em' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)', padding: '0 4px', marginBottom: '2px', letterSpacing: '0.02em' }}>
                       {activeEngine?.name}
                     </span>
                   )}
@@ -428,16 +433,17 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                   <div style={{ 
                     padding: '13px 18px', 
                     borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px', 
-                    backgroundColor: isUser ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.65)', 
+                    // 💡 유저 말풍선 명도 조절 및 가변 테마 할당
+                    backgroundColor: isUser ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : 'var(--bg-glass-card)', 
                     backdropFilter: 'blur(20px)',
                     WebkitBackdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(0, 0, 0, 0.08)', 
-                    color: '#111111', 
+                    border: 'var(--border-glass)', 
+                    color: 'var(--color-text-main)', 
                     fontWeight: 500, 
                     maxWidth: '85%', 
                     lineHeight: 1.6, 
                     fontSize: '0.95rem', 
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
                   }}>
                     {isUser ? (
                       <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.text}</div>
@@ -450,7 +456,8 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                             return !inline && match ? (
                               <div style={{ borderRadius: '8px', overflow: 'hidden', margin: '12px 0', fontSize: '0.88rem', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                                 <SyntaxHighlighter
-                                  style={vscDarkPlus as any}
+                                  // 💡 현재 렌더러단 모드 스코프에 맞춰 코드창 테마를 동적으로 스위칭합니다.
+                                  style={(isDark ? vscDarkPlus : prism) as any}
                                   language={match[1]}
                                   PreTag="div"
                                   {...props}
@@ -459,7 +466,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                                 </SyntaxHighlighter>
                               </div>
                             ) : (
-                              <code style={{ background: 'rgba(0,0,0,0.06)', padding: '2px 5px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em', fontWeight: 600 }} {...props}>
+                              <code style={{ background: 'rgba(128,128,128,0.1)', padding: '2px 5px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em', fontWeight: 600, color: 'var(--color-text-main)' }} {...props}>
                                 {children}
                               </code>
                             );
@@ -483,11 +490,11 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
             
             {loading && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#4E4E5A', padding: '0 4px' }}>{activeEngine?.name}</span>
-                <div style={{ padding: '12px 20px', borderRadius: '16px', backgroundColor: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.08)', backdropFilter: 'blur(20px)' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)', padding: '0 4px' }}>{activeEngine?.name}</span>
+                <div style={{ padding: '12px 20px', borderRadius: '16px', backgroundColor: 'var(--bg-glass-card)', border: 'var(--border-glass)' }}>
                   <span style={{ display: 'inline-flex', gap: '5px', alignItems: 'center' }}>
                     {[0, 1, 2].map(i => (
-                      <span key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2D2D35', display: 'inline-block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                      <span key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-text-main)', display: 'inline-block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                     ))}
                   </span>
                 </div>
@@ -508,16 +515,16 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
               onClick={e => e.stopPropagation()}
               style={{
                 position: 'absolute', bottom: 'calc(100% + 10px)', left: 0, right: 0,
-                background: 'rgba(255, 255, 255, 0.95)', 
-                border: '1px solid rgba(0, 0, 0, 0.15)', 
+                background: 'var(--bg-bubble-bot)', 
+                border: 'var(--border-glass)', 
                 borderRadius: '16px', overflow: 'hidden',
                 backdropFilter: 'blur(30px)',
                 WebkitBackdropFilter: 'blur(30px)',
-                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.12)',
+                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.15)',
                 zIndex: 100,
               }}
             >
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', fontSize: '0.75rem', color: '#4E4E5A', fontWeight: 700, letterSpacing: '0.04em', backgroundColor: 'rgba(0,0,0,0.02)' }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(128,128,128,0.1)', fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 700, letterSpacing: '0.04em', backgroundColor: 'rgba(128,128,128,0.03)' }}>
                 커맨드 — ↑↓ 이동 · Enter 실행 · Tab 자동완성 · Esc 닫기
               </div>
               {filteredCommands.map((cmd, idx) => (
@@ -528,16 +535,16 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                   style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
                     padding: '12px 16px', cursor: 'pointer',
-                    backgroundColor: idx === selectedIndex ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
-                    borderLeft: idx === selectedIndex ? '4px solid #1A1A1E' : '4px solid transparent',
+                    backgroundColor: idx === selectedIndex ? 'rgba(128,128,128,0.06)' : 'transparent',
+                    borderLeft: idx === selectedIndex ? '4px solid var(--color-text-main)' : '4px solid transparent',
                     transition: 'all 0.1s ease',
                   }}
                 >
                   <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{cmd.icon}</span>
-                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1A1A1E', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-text-main)', fontFamily: 'monospace' }}>
                     {cmd.command}
                   </span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4E4E5A', marginLeft: 'auto' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
                     {cmd.description}
                   </span>
                 </div>
@@ -550,12 +557,12 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
             display: 'flex', 
             alignItems: 'center', 
             gap: '10px', 
-            backgroundColor: 'rgba(255, 255, 255, 0.75)', 
+            backgroundColor: 'var(--bg-input)', 
             borderRadius: '24px', 
             padding: '6px 8px 6px 18px', 
             backdropFilter: 'blur(30px)', 
             WebkitAppRegion: 'no-drag',
-            border: showSlashMenu ? '1px solid #1A1A1E' : '1px solid rgba(0, 0, 0, 0.12)', 
+            border: showSlashMenu ? '1px solid var(--color-text-main)' : 'var(--border-glass)', 
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
             transition: 'border-color 0.2s, box-shadow 0.2s' 
           }}>
@@ -566,10 +573,10 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
               onKeyDown={handleKeyDown}
               placeholder={loading ? '응답 대기 중...' : `${activeEngine?.name ?? 'AI'}에게 명령 · /로 커맨드`}
               disabled={loading}
-              style={{ flexGrow: 1, padding: '8px 0', border: 'none', background: 'transparent', color: '#111111', fontWeight: 500, outline: 'none', fontSize: '0.95rem' }}
+              style={{ flexGrow: 1, padding: '8px 0', border: 'none', background: 'transparent', color: 'var(--color-text-main)', fontWeight: 500, outline: 'none', fontSize: '0.95rem' }}
             />
-            <select value={activeEngine?.id ?? ''} onChange={(e) => onProviderChange(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#2D2D35', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', outline: 'none', paddingRight: '4px' }}>
-              {engines.map(eng => <option key={eng.id} value={eng.id} style={{ backgroundColor: '#F4F4F6', color: '#111' }}>{eng.name}</option>)}
+            <select value={activeEngine?.id ?? ''} onChange={(e) => onProviderChange(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', outline: 'none', paddingRight: '4px' }}>
+              {engines.map(eng => <option key={eng.id} value={eng.id} style={{ background: 'var(--bg-input)', color: 'var(--color-text-main)' }}>{eng.name}</option>)}
             </select>
             <button
               onClick={handleSend} disabled={loading || !input.trim()}
@@ -580,8 +587,8 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                 border: 'none', 
                 cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', 
                 padding: '0', 
-                background: loading || !input.trim() ? 'rgba(0,0,0,0.05)' : '#2D2D35', 
-                color: loading || !input.trim() ? '#9E9EAF' : '#FFFFFF', 
+                background: loading || !input.trim() ? 'rgba(128,128,128,0.1)' : 'var(--color-text-main)', 
+                color: loading || !input.trim() ? 'var(--color-text-muted)' : 'var(--bg-input)', 
                 fontSize: '1.1rem', 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -593,7 +600,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
         </div>
       </div>
 
-      <style>{`@keyframes pulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.1); } }`}</style>
     </div>
   );
 }

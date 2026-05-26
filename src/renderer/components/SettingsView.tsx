@@ -128,32 +128,43 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
     setIsAddModalOpen(false);
   };
 
-  // 공용 글래스 스타일 묶음
+  // 💡 [테마 변수 개조] 하드코딩된 라이트 색상을 CSS Variables 양식으로 일괄 이전
   const glassCardStyle: React.CSSProperties = {
-    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.2) 100%)',
-    backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
-    padding: '28px', borderRadius: '16px', border: '1px solid rgba(0, 0, 0, 0.08)',
-    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.04)', boxSizing: 'border-box'
+    background: 'var(--bg-glass-card)',
+    backdropFilter: 'blur(30px)', 
+    WebkitBackdropFilter: 'blur(30px)',
+    padding: '28px', 
+    borderRadius: '16px', 
+    border: 'var(--border-glass)',
+    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.04)', 
+    boxSizing: 'border-box'
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 12px', borderRadius: '8px',
-    border: '1px solid rgba(0, 0, 0, 0.12)', backgroundColor: '#FFFFFF',
-    color: '#111111', fontWeight: 500, fontSize: '0.9rem', outline: 'none',
-    marginTop: '6px', boxSizing: 'border-box'
+    width: '100%', 
+    padding: '10px 12px', 
+    borderRadius: '8px',
+    border: '1px solid var(--border-glass-input)',  // ← 수정
+    backgroundColor: 'var(--bg-input)',
+    color: 'var(--color-text-main)', 
+    fontWeight: 500, 
+    fontSize: '0.9rem', 
+    outline: 'none',
+    marginTop: '6px', 
+    boxSizing: 'border-box'
   };
 
-  const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: '#4E4E5A' };
+  const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' };
 
-  // 각 Provider 명칭별 뱃지 스타일 맵핑 함수
+  // 각 Provider 명칭별 뱃지 스타일 맵핑 함수 (다크모드 시 색상 명도 최적화 스펙 반영)
   const getProviderBadgeStyle = (prov: string) => {
     const isAnthropic = prov === 'anthropic';
     const isGoogle = prov === 'google';
     return {
       fontSize: '0.68rem', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, textTransform: 'uppercase' as const,
-      backgroundColor: isAnthropic ? 'rgba(217, 119, 6, 0.08)' : isGoogle ? 'rgba(0, 102, 204, 0.08)' : 'rgba(0, 0, 0, 0.04)',
-      border: isAnthropic ? '1px solid rgba(217, 119, 6, 0.15)' : isGoogle ? '1px solid rgba(0, 102, 204, 0.15)' : '1px solid rgba(0, 0, 0, 0.05)',
-      color: isAnthropic ? '#d97706' : isGoogle ? '#0066cc' : '#2D2D35'
+      backgroundColor: isAnthropic ? 'rgba(217, 119, 6, 0.12)' : isGoogle ? 'rgba(0, 102, 204, 0.12)' : 'rgba(128, 128, 128, 0.12)',
+      border: isAnthropic ? '1px solid rgba(217, 119, 6, 0.25)' : isGoogle ? '1px solid rgba(0, 102, 204, 0.25)' : '1px solid rgba(128, 128, 128, 0.2)',
+      color: isAnthropic ? '#f59e0b' : isGoogle ? '#38bdf8' : 'var(--color-text-main)'
     };
   };
 
@@ -162,18 +173,17 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
       <div style={{ maxWidth: '840px', margin: '0 auto', padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box' }}>
         
         {/* 대시보드 상단 헤더 바 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '16px' }}>
           <div>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2D2D35', margin: 0, letterSpacing: '-0.02em' }}>Customize Setup</h1>
-            <p style={{ fontSize: '0.85rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>추가 연동을 위한 대형 언어 모델 명세 관리 및 기본 코어 구동 엔진 세팅</p>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-text-main)', margin: 0, letterSpacing: '-0.02em' }}>Customize Setup</h1>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>추가 연동을 위한 대형 언어 모델 명세 관리 및 기본 코어 구동 엔진 세팅</p>
           </div>
           
-          {/* 팝업 액션 버튼 조화 구성 */}
           <button
             onClick={() => setIsAddModalOpen(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px',
-              background: '#2D2D35', color: '#FFFFFF', border: 'none', borderRadius: '10px',
+              background: 'var(--color-text-main)', color: 'var(--color-btn-text)', border: 'none', borderRadius: '10px',
               fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.15s',
               boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
             }}
@@ -184,22 +194,22 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
 
         {/* 1. 활성화 코어 엔진 기본 선택 카드 */}
         <section style={glassCardStyle}>
-          <h2 style={{ color: '#2D2D35', fontSize: '1.1rem', fontWeight: 800, marginTop: 0, marginBottom: '4px', letterSpacing: '-0.01em' }}>Core Engine Selection</h2>
-          <p style={{ fontSize: '0.8rem', color: '#6E6E7A', marginBottom: '16px' }}>클라이언트 작업 공간의 메인 브레인 역할을 수행할 대표 인공지능을 정합니다.</p>
+          <h2 style={{ color: 'var(--color-text-main)', fontSize: '1.1rem', fontWeight: 800, marginTop: 0, marginBottom: '4px', letterSpacing: '-0.01em' }}>Core Engine Selection</h2>
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '16px' }}>클라이언트 작업 공간의 메인 브레인 역할을 수행할 대표 인공지능을 정합니다.</p>
           
           {engines.length === 0 ? (
-            <div style={{ padding: '14px', backgroundColor: 'rgba(220, 38, 38, 0.06)', border: '1px solid rgba(220, 38, 38, 0.15)', color: '#dc2626', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 600 }}>
-              ⚠️ 등록된 LLM 엔진 명세가 전혀 없습니다! 아래 Add Engine 버튼을 통해 최소 1개 이상 추가해야 워크스페이스가 가동됩니다.
+            <div style={{ padding: '14px', backgroundColor: 'rgba(220, 38, 38, 0.08)', border: '1px solid rgba(220, 38, 38, 0.2)', color: '#dc2626', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 600 }}>
+              ⚠️ 등록된 LLM 엔진 명세가 전혀 없습니다! 우측 상단 Add Engine 버튼을 통해 최소 1개 이상 추가해야 워크스페이스가 가동됩니다.
             </div>
           ) : (
             <select 
               value={activeEngine?.id || ''} 
               onChange={(e) => onEngineChange(e.target.value)} 
-              style={{ ...inputStyle, padding: '12px', border: '1px solid rgba(0, 0, 0, 0.15)', backgroundColor: 'rgba(255, 255, 255, 0.85)', fontSize: '0.95rem' }}
+              style={{ ...inputStyle, padding: '12px', border: 'var(--border-glass-input)', fontSize: '0.95rem' }}
             >
-              {!activeEngine && <option value="">--- 가동할 코어 엔진을 선택해 주세요 ---</option>}
+              {!activeEngine && <option value="" style={{ background: 'var(--bg-input)' }}>--- 가동할 코어 엔진을 선택해 주세요 ---</option>}
               {engines.map(eng => (
-                <option key={eng.id} value={eng.id} style={{ backgroundColor: '#F4F4F6', color: '#111' }}>
+                <option key={eng.id} value={eng.id} style={{ background: 'var(--bg-input)', color: 'var(--color-text-main)' }}>
                   {eng.name} — [{eng.provider.toUpperCase()} / {eng.model}]
                 </option>
               ))}
@@ -209,12 +219,12 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
 
         {/* 2. 등록된 AI 엔진 카드 리스트 그리드 세션 */}
         <section style={{ marginTop: '8px' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '16px', color: '#2D2D35', marginTop: 0 }}>Registered Engine Specs ({engines.length})</h2>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '16px', color: 'var(--color-text-main)', marginTop: 0 }}>Registered Engine Specs ({engines.length})</h2>
           
           {engines.length === 0 ? (
             <div style={{ 
-              padding: '60px 20px', textAlign: 'center', color: '#6E6E7A', fontSize: '0.9rem', fontWeight: 500,
-              background: 'rgba(255,255,255,0.4)', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)', backdropFilter: 'blur(20px)'
+              padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem', fontWeight: 500,
+              background: 'var(--bg-glass-card)', borderRadius: '16px', border: 'var(--border-glass)'
             }}>
               ⚙️ 등록된 LLM 명세 파일이 없습니다. 우측 상단의 Add Engine 버튼을 눌러 연동 설정을 등록하세요.
             </div>
@@ -226,66 +236,60 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
                   onMouseEnter={() => setHoveredEngineId(eng.id)}
                   onMouseLeave={() => setHoveredEngineId(null)}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.4) 100%)',
-                    backdropFilter: 'blur(20px)', border: '1px solid rgba(0, 0, 0, 0.08)',
+                    background: 'var(--bg-glass-card)', border: 'var(--border-glass)',
                     borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
                     gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
                     height: '135px', boxSizing: 'border-box'
                   }}
                 >
-                  {/* 상단 명칭 및 종류 라벨 */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
-                      <span style={{ color: '#4E4E5A', opacity: 0.8, display: 'flex', alignItems: 'center' }}><Icon.Cpu /></span>
-                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: '#2D2D35' }}>{eng.name}</span>
+                      <span style={{ color: 'var(--color-text-muted)', opacity: 0.8, display: 'flex', alignItems: 'center' }}><Icon.Cpu /></span>
+                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)' }}>{eng.name}</span>
                     </div>
                     <span style={getProviderBadgeStyle(eng.provider)}>
                       {eng.provider}
                     </span>
                   </div>
 
-                  {/* 중단 라우팅 엔드포인트 세부 식별문자열 */}
                   <div style={{ flexGrow: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9E9EAF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Model Spec Identifier</div>
-                    <div style={{ fontSize: '0.82rem', color: '#4E4E5A', fontFamily: 'monospace', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Model Spec Identifier</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--color-text-main)', fontFamily: 'monospace', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {eng.model}
                     </div>
                   </div>
 
-                  {/* 하단 단독 락업형 내장 자석 컨텍스트 메뉴 단추 */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '8px' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#6E6E7A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', fontFamily: 'monospace' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', fontFamily: 'monospace' }}>
                       {eng.url}
                     </div>
                   </div>
 
-                  {/* 카드 내장 더보기 자석 버튼 구성 */}
                   {(hoveredEngineId === eng.id || menuOpenEngineId === eng.id) && (
                     <button
                       onClick={(e) => handleOpenMenu(e, eng.id)}
                       style={{
                         position: 'absolute', bottom: '12px', right: '14px',
                         background: 'transparent', border: 'none',
-                        color: menuOpenEngineId === eng.id ? '#2D2D35' : '#9E9EAF', 
+                        color: menuOpenEngineId === eng.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
                         cursor: 'pointer', padding: '4px', borderRadius: '4px',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)')}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
                       onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       <Icon.More />
                     </button>
                   )}
 
-                  {/* 카드 내부 완전 수직 귀속 absolute 드롭다운 상자 장착 */}
                   {menuOpenEngineId === eng.id && (
                     <div
                       ref={menuRef}
                       style={{
                         position: 'absolute', bottom: '38px', right: '14px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.98)', backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: '10px',
-                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', padding: '4px', zIndex: 9999,
+                        backgroundColor: 'var(--bg-bubble-bot)', backdropFilter: 'blur(20px)',
+                        border: 'var(--border-glass)', borderRadius: '10px',
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)', padding: '4px', zIndex: 9999,
                         display: 'flex', flexDirection: 'column', gap: '1px', width: '120px',
                       }}
                       onClick={(e) => e.stopPropagation()}
@@ -295,10 +299,10 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
                         style={{
                           display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
                           border: 'none', background: 'transparent', borderRadius: '6px',
-                          fontSize: '0.78rem', fontWeight: 500, color: '#2D2D35', cursor: 'pointer',
+                          fontSize: '0.78rem', fontWeight: 500, color: 'var(--color-text-main)', cursor: 'pointer',
                           textAlign: 'left', width: '100%'
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)')}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
                         onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         <Icon.Edit /> 엔진 정보 수정
@@ -328,19 +332,19 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
         {isAddModalOpen && (
           <div style={{
             position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(15px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(15px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
           }} onClick={resetForm}>
             <div style={{
               width: '460px', padding: '24px', borderRadius: '18px',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 250, 0.95) 100%)',
-              border: '1px solid rgba(0, 0, 0, 0.12)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.18)',
+              background: 'var(--bg-modal)',
+              border: 'var(--border-glass)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.2)',
               display: 'flex', flexDirection: 'column', gap: '16px'
             }} onClick={e => e.stopPropagation()}>
               
               <div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2D2D35' }}>AI 코어 엔진 등록</div>
-                <p style={{ fontSize: '0.8rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>가동할 인공지능 명세 주소와 식별자를 연동 마운트합니다.</p>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>AI 코어 엔진 등록</div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>가동할 인공지능 명세 주소와 식별자를 연동 마운트합니다.</p>
               </div>
 
               <form onSubmit={handleAddEngine} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -348,9 +352,9 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
                   <div>
                     <div style={labelStyle}>Provider</div>
                     <select value={provider} onChange={(e) => setProvider(e.target.value as any)} style={inputStyle}>
-                      <option value="openai">OpenAI</option>
-                      <option value="anthropic">Anthropic</option>
-                      <option value="google">Google</option>
+                      <option value="openai" style={{ background: 'var(--bg-input)' }}>OpenAI</option>
+                      <option value="anthropic" style={{ background: 'var(--bg-input)' }}>Anthropic</option>
+                      <option value="google" style={{ background: 'var(--bg-input)' }}>Google</option>
                     </select>
                   </div>
                   <div>
@@ -376,10 +380,10 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
-                  <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(0,0,0,0.05)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer' }}>
+                  <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                     취소
                   </button>
-                  <button type="submit" style={{ padding: '9px 16px', border: 'none', background: '#2D2D35', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#FFFFFF', cursor: 'pointer' }}>
+                  <button type="submit" style={{ padding: '9px 16px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
                     Activate Engine
                   </button>
                 </div>
@@ -392,28 +396,28 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
         {isEditModalOpen && (
           <div style={{
             position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(10px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(10px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
           }} onClick={() => { setIsEditModalOpen(false); setTargetEngineId(null); }}>
             <div style={{
               width: '420px', padding: '24px', borderRadius: '16px',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 250, 0.95) 100%)',
-              border: '1px solid rgba(0, 0, 0, 0.15)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
+              background: 'var(--bg-modal)',
+              border: 'var(--border-glass)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)',
               display: 'flex', flexDirection: 'column', gap: '14px'
             }} onClick={e => e.stopPropagation()}>
               
               <div>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2D2D35' }}>엔진 설정 명세 수정</div>
-                <p style={{ fontSize: '0.78rem', color: '#6E6E7A', margin: '4px 0 0 0' }}>해당 코어 인공지능의 연동 명세 구조를 재정비합니다.</p>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>엔진 설정 명세 수정</div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>해당 코어 인공지능의 연동 명세 구조를 재정비합니다.</p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
                   <div style={labelStyle}>Provider</div>
                   <select value={provider} onChange={(e) => setProvider(e.target.value as any)} style={inputStyle}>
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="google">Google</option>
+                    <option value="openai" style={{ background: 'var(--bg-input)' }}>OpenAI</option>
+                    <option value="anthropic" style={{ background: 'var(--bg-input)' }}>Anthropic</option>
+                    <option value="google" style={{ background: 'var(--bg-input)' }}>Google</option>
                   </select>
                 </div>
                 <div>
@@ -442,15 +446,15 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
                 <button
                   type="button"
                   onClick={() => { setIsEditModalOpen(false); setTargetEngineId(null); }}
-                  style={{ padding: '8px 14px', border: 'none', background: 'rgba(0,0,0,0.05)', borderRadius: '6px', fontSize: '#0.82rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer' }}
+                  style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}
                 >취소</button>
                 <button
                   type="button"
                   onClick={handleSaveEditPopup}
                   disabled={!name.trim() || !url.trim() || !model.trim()}
                   style={{ 
-                    padding: '8px 14px', border: 'none', background: '#2D2D35', borderRadius: '6px', 
-                    fontSize: '0.82rem', fontWeight: 600, color: '#FFFFFF', 
+                    padding: '8px 14px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '6px', 
+                    fontSize: '0.82rem', fontWeight: 600, 
                     cursor: (name.trim() && url.trim() && model.trim()) ? 'pointer' : 'not-allowed', 
                     opacity: (name.trim() && url.trim() && model.trim()) ? 1 : 0.5 
                   }}

@@ -75,6 +75,17 @@ const Icon = {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
     </svg>
+  ),
+  // 💡 [테마 아이콘 추가] 해/달 토글 스위치용 SVG
+  Sun: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.36" x2="5.64" y2="17.94"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+  ),
+  Moon: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
   )
 };
 
@@ -88,15 +99,20 @@ export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
 
-  // 💡 더보기 컨텍스트 메뉴 State
+  // 더보기 컨텍스트 메뉴용 제어 상태
   const [menuOpenSessionId, setMenuOpenSessionId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 💡 [개조] 이름 변경 전용 독립 모달 팝업 상태 트리거
+  // 이름 변경 모달 팝업 상태 트래커
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [targetRenameSessionId, setTargetRenameSessionId] = useState<string | null>(null);
   const [editTitleInput, setEditTitleInput] = useState<string>('');
+
+  // 💡 [신규 추가] 다크모드 영속성 제어 스위치 (기본값 로컬스토리지 연동)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('theme') === 'dark';
+  });
 
   const loadEngines = async () => {
     setIsLoading(true);
@@ -118,7 +134,18 @@ export default function App() {
 
   useEffect(() => { loadEngines(); loadSessions(); }, []);
 
-  // 외부 클릭 시 미니 컨텍스트 메뉴 닫기 유틸리티
+  // 💡 [신규 추가] 테마 상태 바뀔 때마다 최상위 document 노드에 다크모드 클래스 및 CSS 변수 바인딩
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  // 외부 클릭 시 컨텍스트 메뉴 닫기 유틸리티
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -159,7 +186,6 @@ export default function App() {
     setMenuOpenSessionId(null);
   };
 
-  // 💡 [변경] 이름 수정 메뉴 클릭 시 모달 팝업 가동 활성화
   const handleStartRenameModal = (id: string, currentTitle: string) => {
     setTargetRenameSessionId(id);
     setEditTitleInput(currentTitle);
@@ -167,7 +193,6 @@ export default function App() {
     setMenuOpenSessionId(null);
   };
 
-  // 💡 [변경] 팝업창 내부에서 '저장'을 완결하는 공통 함수
   const handleSaveRenamePopup = async () => {
     if (!targetRenameSessionId || !editTitleInput.trim()) {
       setIsRenameModalOpen(false);
@@ -194,19 +219,23 @@ export default function App() {
   const activeEngine = engines.find(e => e.id === activeEngineId) || engines[0];
 
   const menuItems = [
-    { view: 'chat' as const,     Icon: Icon.Chat,     label: 'Chat Workspace' },
-    { view: 'plugins' as const,  Icon: Icon.Plugin,   label: 'Plugin Manager' },
-    { view: 'settings' as const, Icon: Icon.Settings, label: 'Customize Setup' },
+    { view: 'chat' as const,     Icon: Icon.Chat,     label: 'Chat' },
+    { view: 'plugins' as const,  Icon: Icon.Plugin,   label: 'MCP Plugins' },
+    { view: 'settings' as const, Icon: Icon.Settings, label: 'Engine Setup' },
   ];
 
   return (
     <div style={{
       display: 'flex', width: '100vw', height: '100vh',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      color: '#2D2D35',
-      background: 'linear-gradient(135deg, #F9F9FB 0%, #F4F4F6 50%, #EAEAEF 100%)',
+      
+      // 💡 [테마 연동 가변 색상 제어]
+      color: isDarkMode ? '#EAEAEF' : '#2D2D35',
+      background: isDarkMode 
+        ? 'linear-gradient(135deg, #16161A 0%, #1A1A22 50%, #121216 100%)' 
+        : 'linear-gradient(135deg, #F9F9FB 0%, #F4F4F6 50%, #EAEAEF 100%)',
       position: 'relative', borderRadius: '14px', overflow: 'hidden',
-      border: '1px solid rgba(0, 0, 0, 0.06)',
+      border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid rgba(0, 0, 0, 0.06)',
     }}>
 
       {/* ── 사이드바 ── */}
@@ -215,9 +244,10 @@ export default function App() {
         minWidth: isSidebarOpen ? '240px' : '0px',
         opacity: isSidebarOpen ? 1 : 0,
         pointerEvents: isSidebarOpen ? 'auto' : 'none',
-        backgroundColor: 'rgba(244, 244, 246, 0.4)',
+        // 💡 다크 모드 시 투명 어두운 안개 글래스 이식
+        backgroundColor: isDarkMode ? 'rgba(22, 22, 26, 0.45)' : 'rgba(244, 244, 246, 0.4)',
         backdropFilter: 'blur(40px)',
-        borderRight: isSidebarOpen ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+        borderRight: isSidebarOpen ? (isDarkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0, 0, 0, 0.05)') : 'none',
         display: 'flex', flexDirection: 'column',
         transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), min-width 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',
         zIndex: 10, overflow: 'hidden',
@@ -229,11 +259,11 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px', marginTop: '44px', marginBottom: '12px', flexShrink: 0 }}>
             <div style={{
               width: '28px', height: '28px', borderRadius: '8px',
-              background: '#2D2D35',
+              background: isDarkMode ? '#EAEAEF' : '#2D2D35',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.8rem', fontWeight: 'bold', color: '#F9F9FB', flexShrink: 0,
+              fontSize: '0.8rem', fontWeight: 'bold', color: isDarkMode ? '#16161A' : '#F9F9FB', flexShrink: 0,
             }}>U</div>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#2D2D35', whiteSpace: 'nowrap' }}>oxxultus</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: isDarkMode ? '#EAEAEF' : '#2D2D35', whiteSpace: 'nowrap' }}>oxxultus</span>
           </div>
 
           {/* 새 채팅 버튼 */}
@@ -242,12 +272,13 @@ export default function App() {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               width: '100%', padding: '10px 14px', borderRadius: '10px', marginBottom: '16px',
-              background: 'rgba(0, 0, 0, 0.03)', border: '1px solid rgba(0, 0, 0, 0.08)',
-              color: '#2D2D35', fontSize: '0.85rem', fontWeight: 600,
+              background: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)',
+              border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.08)',
+              color: isDarkMode ? '#EAEAEF' : '#2D2D35', fontSize: '0.85rem', fontWeight: 600,
               cursor: 'pointer', transition: 'all 0.15s ease', flexShrink: 0,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.06)'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.15)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.03)'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0, 0, 0, 0.06)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0, 0, 0, 0.03)'; }}
           >
             <Icon.Plus /> 새 채팅
           </button>
@@ -256,7 +287,7 @@ export default function App() {
           {sessions.length > 0 && (
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', marginBottom: '12px' }}>
               <div style={{
-                fontSize: '0.68rem', fontWeight: 700, color: '#9E9EAF',
+                fontSize: '0.68rem', fontWeight: 700, color: isDarkMode ? '#6E6E7A' : '#9E9EAF',
                 textTransform: 'uppercase', letterSpacing: '0.1em',
                 padding: '0 6px', marginBottom: '6px',
               }}>채팅 기록</div>
@@ -271,11 +302,13 @@ export default function App() {
                       style={{
                         display: 'flex', alignItems: 'center', gap: '8px',
                         width: '100%', padding: '8px 10px', borderRadius: '8px',
-                        backgroundColor: isActive ? 'rgba(0, 0, 0, 0.04)' : isHovered ? 'rgba(0, 0, 0, 0.02)' : 'transparent',
-                        color: isActive ? '#2D2D35' : '#6E6E7A',
+                        backgroundColor: isActive 
+                          ? (isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)') 
+                          : isHovered ? (isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0, 0, 0, 0.02)') : 'transparent',
+                        color: isActive ? (isDarkMode ? '#FFFFFF' : '#2D2D35') : (isDarkMode ? '#9E9EAF' : '#6E6E7A'),
                         fontSize: '0.82rem', fontWeight: isActive ? 600 : 400,
                         cursor: 'pointer',
-                        border: isActive ? '1px solid rgba(0, 0, 0, 0.03)' : '1px solid transparent',
+                        border: isActive ? (isDarkMode ? '1px solid rgba(255,255,255,0.03)' : '1px solid rgba(0, 0, 0, 0.03)') : '1px solid transparent',
                         transition: 'all 0.12s ease', boxSizing: 'border-box',
                         height: '34px', position: 'relative'
                       }}
@@ -288,18 +321,17 @@ export default function App() {
                         {session.title}
                       </span>
 
-                      {/* 호버 시 우측 컨텍스트 점 세개 더보기 버튼 노출 */}
                       {(isHovered || isActive || menuOpenSessionId === session.id) && (
                         <button
                           onClick={(e) => handleOpenMenu(e, session.id)}
                           style={{
                             position: 'absolute', right: '8px',
                             background: 'transparent', border: 'none',
-                            color: menuOpenSessionId === session.id ? '#2D2D35' : '#9E9EAF', 
+                            color: menuOpenSessionId === session.id ? (isDarkMode ? '#FFF' : '#2D2D35') : '#9E9EAF', 
                             cursor: 'pointer', padding: '4px', borderRadius: '4px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
-                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)')}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)')}
                           onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
                           <Icon.More />
@@ -312,7 +344,7 @@ export default function App() {
             </div>
           )}
 
-          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 4px 12px', flexShrink: 0 }} />
+          <div style={{ height: '1px', background: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0, 0, 0, 0.06)', margin: '0 4px 12px', flexShrink: 0 }} />
 
           {/* 내비게이션 메뉴 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
@@ -325,14 +357,14 @@ export default function App() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
                     width: '100%', padding: '10px 12px', borderRadius: '9px',
-                    backgroundColor: isActive ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
-                    color: isActive ? '#2D2D35' : '#6E6E7A',
+                    backgroundColor: isActive ? (isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0, 0, 0, 0.04)') : 'transparent',
+                    color: isActive ? (isDarkMode ? '#FFFFFF' : '#2D2D35') : (isDarkMode ? '#9E9EAF' : '#6E6E7A'),
                     fontSize: '0.85rem', fontWeight: isActive ? 600 : 400,
                     border: isActive ? '1px solid rgba(0, 0, 0, 0.02)' : '1px solid transparent',
                     cursor: 'pointer', transition: 'all 0.12s ease', textAlign: 'left',
                   }}
-                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)'; e.currentTarget.style.color = '#2D2D35'; } }}
-                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6E6E7A'; } }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0, 0, 0, 0.02)'; } }}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; } }}
                 >
                   <span style={{ opacity: isActive ? 1 : 0.7, flexShrink: 0 }}><Ic /></span>
                   {label}
@@ -346,15 +378,15 @@ export default function App() {
       {/* ── 메인 영역 ── */}
       <div style={{
         flexGrow: 1, height: '100%', minWidth: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: isDarkMode ? 'rgba(22, 22, 26, 0.1)' : 'rgba(255, 255, 255, 0.15)',
         backdropFilter: 'blur(20px)',
         display: 'flex', flexDirection: 'column',
       }}>
         {/* 드래그 헤더 */}
         <div style={{
           height: '52px', minHeight: '52px', position: 'relative',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+          borderBottom: isDarkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0, 0, 0, 0.05)',
+          backgroundColor: isDarkMode ? 'rgba(22, 22, 26, 0.3)' : 'rgba(255, 255, 255, 0.3)',
           // @ts-ignore
           WebkitAppRegion: 'drag',
           display: 'flex', alignItems: 'center',
@@ -365,21 +397,36 @@ export default function App() {
           <div style={{
             // @ts-ignore
             WebkitAppRegion: 'no-drag',
-            display: 'flex', alignItems: 'center', zIndex: 10,
+            display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10,
           }}>
             <button
               onClick={() => setIsSidebarOpen(prev => !prev)}
               style={{
-                background: 'rgba(0, 0, 0, 0.02)', border: '1px solid rgba(0, 0, 0, 0.05)',
+                background: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0, 0, 0, 0.02)', 
+                border: isDarkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0, 0, 0, 0.05)',
                 color: '#6E6E7A', cursor: 'pointer',
                 padding: '6px 8px', borderRadius: '8px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.15s ease',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; e.currentTarget.style.color = '#2D2D35'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.02)'; e.currentTarget.style.color = '#6E6E7A'; }}
             >
               {isSidebarOpen ? <Icon.PanelClose /> : <Icon.PanelOpen />}
+            </button>
+
+            {/* 💡 [테마 전환 스위치 단추 심기] */}
+            <button
+              onClick={() => setIsDarkMode(prev => !prev)}
+              title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+              style={{
+                background: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0, 0, 0, 0.02)', 
+                border: isDarkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0, 0, 0, 0.05)',
+                color: isDarkMode ? '#f59e0b' : '#6E6E7A', cursor: 'pointer',
+                padding: '6px 8px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {isDarkMode ? <Icon.Sun /> : <Icon.Moon />}
             </button>
           </div>
 
@@ -410,14 +457,15 @@ export default function App() {
               />
             ) : (
               <div style={{ textAlign: 'center', color: '#6E6E7A' }}>
-                <div style={{ fontSize: '1rem', marginBottom: '8px', color: '#2D2D35', fontWeight: 600 }}>새 채팅을 시작하세요</div>
+                <div style={{ fontSize: '1rem', marginBottom: '8px', color: isDarkMode ? '#FFF' : '#2D2D35', fontWeight: 600 }}>새 채팅을 시작하세요</div>
                 <button
                   onClick={handleNewChat}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '8px',
                     padding: '10px 24px', borderRadius: '10px',
-                    background: 'rgba(0, 0, 0, 0.03)', border: '1px solid rgba(0, 0, 0, 0.08)',
-                    color: '#2D2D35', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+                    background: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0, 0, 0, 0.03)',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0, 0, 0, 0.08)',
+                    color: isDarkMode ? '#FFF' : '#2D2D35', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
                   }}
                 ><Icon.Plus /> 새 채팅 시작</button>
               </div>
@@ -430,15 +478,17 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── 미니 컨텍스트 조작 메뉴 ── */}
+      {/* ── 대화 기록 미니 컨텍스트 조작 메뉴 ── */}
       {menuOpenSessionId && (
         <div
           ref={menuRef}
           style={{
             position: 'absolute', top: menuPosition.top, left: menuPosition.left,
-            backgroundColor: 'rgba(255, 255, 255, 0.96)', backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: '10px',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08)', padding: '4px', zIndex: 9999,
+            backgroundColor: isDarkMode ? 'rgba(30, 30, 38, 0.98)' : 'rgba(255, 255, 255, 0.96)', 
+            backdropFilter: 'blur(20px)',
+            border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0, 0, 0, 0.12)', 
+            borderRadius: '10px',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)', padding: '4px', zIndex: 9999,
             display: 'flex', flexDirection: 'column', gap: '1px', width: '110px',
           }}
           onClick={(e) => e.stopPropagation()}
@@ -451,9 +501,9 @@ export default function App() {
             style={{
               display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
               border: 'none', background: 'transparent', borderRadius: '6px',
-              fontSize: '0.78rem', fontWeight: 500, color: '#2D2D35', cursor: 'pointer',
+              fontSize: '0.78rem', fontWeight: 500, color: isDarkMode ? '#EAEAEF' : '#2D2D35', cursor: 'pointer',
             }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)')}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0, 0, 0, 0.04)')}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
             <Icon.Edit /> 이름 변경
@@ -473,21 +523,24 @@ export default function App() {
         </div>
       )}
 
-      {/* ── 💡 [신규 추가] 완전히 독립된 중앙 글래스모피즘 이름 변경 모달 팝업 레이어 ── */}
+      {/* ── 중앙 글래스모피즘 이름 변경 모달 팝업 레이어 ── */}
       {isRenameModalOpen && (
         <div style={{
           position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.15)', backdropFilter: 'blur(10px)',
+          backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(10px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
         }} onClick={() => setIsRenameModalOpen(false)}>
           <div style={{
             width: '320px', padding: '20px', borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 245, 250, 0.9) 100%)',
-            border: '1px solid rgba(0, 0, 0, 0.15)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
+            background: isDarkMode 
+              ? 'linear-gradient(135deg, rgba(30, 30, 38, 0.98) 0%, rgba(20, 20, 25, 0.95) 100%)'
+              : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 245, 250, 0.9) 100%)',
+            border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0, 0, 0, 0.15)', 
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)',
             display: 'flex', flexDirection: 'column', gap: '14px'
           }} onClick={e => e.stopPropagation()}>
             
-            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#2D2D35' }}>채팅방 이름 변경</div>
+            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: isDarkMode ? '#FFF' : '#2D2D35' }}>채팅방 이름 변경</div>
             
             <input
               type="text"
@@ -501,8 +554,10 @@ export default function App() {
               }}
               style={{
                 width: '100%', padding: '10px 12px', fontSize: '0.88rem',
-                border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: '8px',
-                outline: 'none', backgroundColor: '#FFFFFF', color: '#111111',
+                border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0, 0, 0, 0.12)', 
+                borderRadius: '8px', outline: 'none', 
+                backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : '#FFFFFF', 
+                color: isDarkMode ? '#FFF' : '#111111',
                 boxSizing: 'border-box'
               }}
             />
@@ -514,20 +569,16 @@ export default function App() {
                   padding: '8px 14px', border: 'none', background: 'rgba(0,0,0,0.05)',
                   borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: '#6E6E7A', cursor: 'pointer'
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.05)')}
               >취소</button>
               <button
                 onClick={handleSaveRenamePopup}
                 disabled={!editTitleInput.trim()}
                 style={{
-                  padding: '8px 14px', border: 'none', background: '#2D2D35',
-                  borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: '#FFFFFF',
+                  padding: '8px 14px', border: 'none', background: isDarkMode ? '#EAEAEF' : '#2D2D35',
+                  borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: isDarkMode ? '#16161A' : '#FFFFFF',
                   cursor: editTitleInput.trim() ? 'pointer' : 'not-allowed',
                   opacity: editTitleInput.trim() ? 1 : 0.5
                 }}
-                onMouseEnter={e => { if (editTitleInput.trim()) e.currentTarget.style.background = '#1A1A20'; }}
-                onMouseLeave={e => { if (editTitleInput.trim()) e.currentTarget.style.background = '#2D2D35'; }}
               >저장</button>
             </div>
 
@@ -535,6 +586,35 @@ export default function App() {
         </div>
       )}
 
+      {/* 전역 테마 주입을 위한 CSS Variables 스타일시트 하이재킹 */}
+      <style>{`
+        /* 💡 다크모드 시 자식 하위 뷰들이 가져다 쓸 전역 CSS 테마 변수 구축 */
+        :root[data-theme='dark'] {
+          --bg-glass-card: linear-gradient(135deg, rgba(30, 30, 38, 0.55) 0%, rgba(20, 20, 25, 0.35) 100%);
+          --border-glass: 1px solid rgba(255, 255, 255, 0.06);
+          --bg-input: rgba(0, 0, 0, 0.25);
+          --color-text-main: #EAEAEF;
+          --color-text-muted: #9E9EAF;
+          --bg-bubble-bot: rgba(30, 30, 38, 0.7);
+          /* ↓ 추가 */
+          --bg-modal: rgba(28, 28, 36, 0.98);
+          --border-glass-input: rgba(255, 255, 255, 0.14);
+          --color-btn-text: #16161A;
+        }
+        :root[data-theme='light'] {
+          --bg-glass-card: linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.2) 100%);
+          --border-glass: 1px solid rgba(0, 0, 0, 0.08);
+          --bg-input: rgba(255, 255, 255, 0.75);
+          --color-text-main: #111111;
+          --color-text-muted: #6E6E7A;
+          --bg-bubble-bot: rgba(255, 255, 255, 0.65);
+          /* ↓ 추가 */
+          --bg-modal: rgba(255, 255, 255, 0.97);
+          --border-glass-input: rgba(0, 0, 0, 0.12);
+          --color-btn-text: #F9F9FB;
+        }
+        @keyframes pulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.1); } }
+      `}</style>
     </div>
   );
 }
