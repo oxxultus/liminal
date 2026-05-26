@@ -154,7 +154,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
             text: `📋 [저장된 요약]\n${summaryRow.summary}`,
           }]);
         } else if (apiConversation.length > 0) {
-          // 요약본 없으면 즉석 요약
           setIsSummarizing(true);
           try {
             const res = await window.electronAPI.sendChat({
@@ -315,7 +314,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
-  // ── 메시지 전송 ──
+  // ── 메시지 전송 및 MCP 통합 실행 로직 (복구 완료) ──
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     if (input.startsWith('/')) {
@@ -343,6 +342,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
 
     try {
+      // 🔌 MCP 도구 스펙 추출 유틸 가동
       const rawTools: any[] = await window.electronAPI.getMcpTools();
       const toolsByProvider: Record<string, any[]> = {
         anthropic: rawTools.map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
@@ -390,6 +390,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
         return;
       }
 
+      // 🛠️ 대형 모델의 MCP 도구 콜 동적 라우팅 및 가로채기 파트
       const claudeResultBlocks: any[] = [];
       for (const tool of requestedTools) {
         setMessages(prev => [...prev, { id: generateId(), sender: 'system', text: `⚙️ [MCP SYSTEM] 실행 중 -> ${tool.name}` }]);
@@ -397,6 +398,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
         const resultText = execRes.success
           ? execRes.result?.content?.map((c: any) => c.text).join('\n') ?? JSON.stringify(execRes.result)
           : `❌ 실패: ${execRes.error}`;
+        
         if (!execRes.success) setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: resultText }]);
         if (activeEngine.provider === 'openai') {
           updatedHistory.push({ role: 'tool', tool_call_id: tool.id, content: resultText });
@@ -422,9 +424,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
 
     } catch (error: any) {
       setMessages(prev => [...prev, { id: generateId(), sender: 'bot', text: `❌ 에러: ${error.message}` }]);
-    } finally {
-      setLoading(false);
-    }
+    } window.electronAPI.getMcpTools().catch(() => []).finally(() => setLoading(false));
   };
 
   return (
@@ -432,42 +432,66 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
 
       {/* 요약 진행 배너 */}
       {isSummarizing && (
-        <div style={{ padding: '8px 20px', textAlign: 'center', background: 'linear-gradient(90deg, rgba(6,182,212,0.15), rgba(30,58,138,0.2))', borderBottom: '1px solid rgba(6,182,212,0.2)', fontSize: '0.8rem', color: 'rgba(207,250,254,0.7)' }}>
+        <div style={{ padding: '10px 20px', textAlign: 'center', background: 'rgba(0, 0, 0, 0.04)', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', fontSize: '0.8rem', color: '#1A1A1E', fontWeight: 600 }}>
           ✦ 대화 내용을 요약하는 중입니다...
         </div>
       )}
 
-      {/* 메시지 목록 */}
+      {/* 메시지 목록 피드 */}
       <div style={{ flexGrow: 1, width: '100%', padding: '30px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
         {isLoadingHistory ? (
-          <div style={{ color: 'rgba(207,250,254,0.4)', fontSize: '0.9rem', marginTop: '40px' }}>대화 기록 불러오는 중...</div>
+          <div style={{ color: '#4E4E5A', fontSize: '0.9rem', marginTop: '40px', fontWeight: 500 }}>대화 기록 불러오는 중...</div>
         ) : (
           <div style={{ width: '100%', maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {messages.map((msg) => {
               const isUser = msg.sender === 'user';
+              
               if (msg.sender === 'system') return (
-                <div key={msg.id} style={{ alignSelf: 'center', fontSize: '0.8rem', color: '#67e8f9', padding: '10px 16px', borderRadius: '12px', border: '1px solid rgba(103,232,249,0.15)', background: 'rgba(6,182,212,0.08)', whiteSpace: 'pre-wrap', maxWidth: '90%', lineHeight: 1.6 }}>
+                <div key={msg.id} style={{ alignSelf: 'center', fontSize: '0.85rem', color: '#1A1A1E', fontWeight: 600, padding: '10px 16px', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(0, 0, 0, 0.03)', whiteSpace: 'pre-wrap', maxWidth: '90%', lineHeight: 1.6 }}>
                   {msg.text}
                 </div>
               );
+              
               return (
                 <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: isUser ? '#a29bfe' : '#fdcb6e', padding: '0 4px' }}>
-                    {isUser ? 'Oxxultus' : activeEngine?.name}
-                  </span>
-                  <div style={{ padding: '12px 18px', borderRadius: '16px', backgroundColor: isUser ? 'rgba(162,155,254,0.15)' : 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', maxWidth: '85%', lineHeight: 1.6, fontSize: '0.9rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  
+                  {/* 발신자 태그: AI 엔진 이름만 노출 (유저 닉네임 제거 UX 반영) */}
+                  {!isUser && (
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#4E4E5A', padding: '0 4px', marginBottom: '2px', letterSpacing: '0.02em' }}>
+                      {activeEngine?.name}
+                    </span>
+                  )}
+                  
+                  {/* 말풍선 버블 선명화 스펙 */}
+                  <div style={{ 
+                    padding: '13px 18px', 
+                    borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px', 
+                    backgroundColor: isUser ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.65)', 
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(0, 0, 0, 0.08)', 
+                    color: '#111111', 
+                    fontWeight: 500, 
+                    maxWidth: '85%', 
+                    lineHeight: 1.6, 
+                    fontSize: '0.95rem', 
+                    whiteSpace: 'pre-wrap', 
+                    wordBreak: 'break-word',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
+                  }}>
                     {msg.text}
                   </div>
                 </div>
               );
             })}
+            
             {loading && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fdcb6e', padding: '0 4px' }}>{activeEngine?.name}</span>
-                <div style={{ padding: '12px 18px', borderRadius: '16px', backgroundColor: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ display: 'inline-flex', gap: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#4E4E5A', padding: '0 4px' }}>{activeEngine?.name}</span>
+                <div style={{ padding: '12px 20px', borderRadius: '16px', backgroundColor: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.08)', backdropFilter: 'blur(20px)' }}>
+                  <span style={{ display: 'inline-flex', gap: '5px', alignItems: 'center' }}>
                     {[0, 1, 2].map(i => (
-                      <span key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'rgba(207,250,254,0.5)', display: 'inline-block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                      <span key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#2D2D35', display: 'inline-block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                     ))}
                   </span>
                 </div>
@@ -478,26 +502,26 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
         )}
       </div>
 
-      {/* 입력창 + 슬래시 메뉴 */}
+      {/* 입력 패널 영역 */}
       <div style={{ padding: '16px 20px 30px 20px', display: 'flex', justifyContent: 'center', position: 'relative' }}>
         <div style={{ width: '100%', maxWidth: '720px', position: 'relative' }}>
 
-          {/* 슬래시 커맨드 팝업 */}
+          {/* 슬래시 커맨드 팝업 메뉴 (가독성 상향 스펙) */}
           {showSlashMenu && filteredCommands.length > 0 && (
             <div
               onClick={e => e.stopPropagation()}
               style={{
-                position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, right: 0,
-                backgroundColor: 'rgba(10, 20, 55, 0.96)',
-                border: '1px solid rgba(6,182,212,0.25)',
-                borderRadius: '14px', overflow: 'hidden',
-                backdropFilter: 'blur(20px)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                position: 'absolute', bottom: 'calc(100% + 10px)', left: 0, right: 0,
+                background: 'rgba(255, 255, 255, 0.95)', 
+                border: '1px solid rgba(0, 0, 0, 0.15)', 
+                borderRadius: '16px', overflow: 'hidden',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
+                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.12)',
                 zIndex: 100,
               }}
             >
-              {/* 팝업 헤더 */}
-              <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(207,250,254,0.06)', fontSize: '0.7rem', color: 'rgba(207,250,254,0.35)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', fontSize: '0.75rem', color: '#4E4E5A', fontWeight: 700, letterSpacing: '0.04em', backgroundColor: 'rgba(0,0,0,0.02)' }}>
                 커맨드 — ↑↓ 이동 · Enter 실행 · Tab 자동완성 · Esc 닫기
               </div>
               {filteredCommands.map((cmd, idx) => (
@@ -507,17 +531,17 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                   onMouseEnter={() => setSelectedIndex(idx)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '10px 14px', cursor: 'pointer',
-                    backgroundColor: idx === selectedIndex ? 'rgba(6,182,212,0.12)' : 'transparent',
-                    borderLeft: idx === selectedIndex ? '2px solid rgba(6,182,212,0.6)' : '2px solid transparent',
+                    padding: '12px 16px', cursor: 'pointer',
+                    backgroundColor: idx === selectedIndex ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+                    borderLeft: idx === selectedIndex ? '4px solid #1A1A1E' : '4px solid transparent',
                     transition: 'all 0.1s ease',
                   }}
                 >
-                  <span style={{ fontSize: '1rem', flexShrink: 0 }}>{cmd.icon}</span>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: idx === selectedIndex ? '#cffafe' : 'rgba(207,250,254,0.8)', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{cmd.icon}</span>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1A1A1E', fontFamily: 'monospace' }}>
                     {cmd.command}
                   </span>
-                  <span style={{ fontSize: '0.8rem', color: 'rgba(207,250,254,0.4)', marginLeft: 'auto' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4E4E5A', marginLeft: 'auto' }}>
                     {cmd.description}
                   </span>
                 </div>
@@ -525,23 +549,49 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
             </div>
           )}
 
-          {/* 입력창 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: '24px', padding: '8px 16px', backdropFilter: 'blur(10px)', border: showSlashMenu ? '1px solid rgba(6,182,212,0.3)' : '1px solid rgba(207,250,254,0.1)', transition: 'border-color 0.15s' }}>
+          {/* 메인 인풋 박스 */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '10px', 
+            backgroundColor: 'rgba(255, 255, 255, 0.75)', 
+            borderRadius: '24px', 
+            padding: '6px 8px 6px 18px', 
+            backdropFilter: 'blur(30px)', 
+            WebkitBackdropFilter: 'blur(30px)',
+            border: showSlashMenu ? '1px solid #1A1A1E' : '1px solid rgba(0, 0, 0, 0.12)', 
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
+            transition: 'border-color 0.2s, box-shadow 0.2s' 
+          }}>
             <input
               ref={inputRef}
               type="text" value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={loading ? (isSummarizing ? '대화 요약 중...' : '응답 대기 중...') : `${activeEngine?.name ?? 'AI'}에게 명령 · /로 커맨드`}
+              placeholder={loading ? '응답 대기 중...' : `${activeEngine?.name ?? 'AI'}에게 명령 · /로 커맨드`}
               disabled={loading}
-              style={{ flexGrow: 1, padding: '8px', border: 'none', background: 'transparent', color: '#fff', outline: 'none', fontSize: '0.9rem' }}
+              style={{ flexGrow: 1, padding: '8px 0', border: 'none', background: 'transparent', color: '#111111', fontWeight: 500, outline: 'none', fontSize: '0.95rem' }}
             />
-            <select value={activeEngine?.id ?? ''} onChange={(e) => onProviderChange(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'rgba(207,250,254,0.6)', cursor: 'pointer', fontSize: '0.8rem', outline: 'none' }}>
-              {engines.map(eng => <option key={eng.id} value={eng.id} style={{ backgroundColor: '#0d1b3e' }}>{eng.name}</option>)}
+            <select value={activeEngine?.id ?? ''} onChange={(e) => onProviderChange(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#2D2D35', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', outline: 'none', paddingRight: '4px' }}>
+              {engines.map(eng => <option key={eng.id} value={eng.id} style={{ backgroundColor: '#F4F4F6', color: '#111' }}>{eng.name}</option>)}
             </select>
             <button
               onClick={handleSend} disabled={loading || !input.trim()}
-              style={{ width: '34px', height: '34px', borderRadius: '50%', border: 'none', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', padding: '0', background: loading || !input.trim() ? 'rgba(207,250,254,0.1)' : 'linear-gradient(135deg, #06b6d4, #1e3a8a)', color: '#cffafe', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
+              style={{ 
+                width: '36px', 
+                height: '36px', 
+                borderRadius: '50%', 
+                border: 'none', 
+                cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', 
+                padding: '0', 
+                background: loading || !input.trim() ? 'rgba(0,0,0,0.05)' : '#2D2D35', 
+                color: loading || !input.trim() ? '#9E9EAF' : '#FFFFFF', 
+                fontSize: '1.1rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                transition: 'all 0.15s ease',
+              }}
             >↑</button>
           </div>
         </div>

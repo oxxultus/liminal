@@ -1,5 +1,5 @@
 // src/renderer/App.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import ChatView from './components/ChatView';
 import SettingsView from './components/SettingsView';
 import PluginsView from './components/PluginsView';
@@ -24,23 +24,15 @@ function generateId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-// SVG 아이콘 컴포넌트
 const Icon = {
-  Menu: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-  ),
   PanelClose: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
-      <polyline points="15 9 12 12 15 15"/>
+      <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="15 9 12 12 15 15"/>
     </svg>
   ),
   PanelOpen: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
-      <polyline points="12 9 15 12 12 15"/>
+      <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="12 9 15 12 12 15"/>
     </svg>
   ),
   Chat: () => (
@@ -50,8 +42,7 @@ const Icon = {
   ),
   Plugin: () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/>
-      <line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>
+      <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>
     </svg>
   ),
   Settings: () => (
@@ -67,8 +58,7 @@ const Icon = {
   ),
   Trash: () => (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
-      <path d="M9 6V4h6v2"/>
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
     </svg>
   ),
   MessageCircle: () => (
@@ -106,12 +96,8 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    loadEngines();
-    loadSessions();
-  }, []);
+  useEffect(() => { loadEngines(); loadSessions(); }, []);
 
-  // Ctrl+B 단축키로 사이드바 토글
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
@@ -142,10 +128,6 @@ export default function App() {
     }
   };
 
-  const handleSessionTitleUpdate = async () => {
-    await loadSessions();
-  };
-
   const activeEngine = engines.find(e => e.id === activeEngineId) || engines[0];
 
   const menuItems = [
@@ -158,10 +140,12 @@ export default function App() {
     <div style={{
       display: 'flex', width: '100vw', height: '100vh',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      color: '#cffafe',
-      background: 'linear-gradient(135deg, #0d1b3e 0%, #1e3a8a 40%, #081229 100%)',
+      
+      /* 🤍 차분한 다크 소프트 엠버 그레이 텍스트 및 프레임 매핑 */
+      color: '#2D2D35',
+      background: 'linear-gradient(135deg, #F9F9FB 0%, #F4F4F6 50%, #EAEAEF 100%)',
       position: 'relative', borderRadius: '14px', overflow: 'hidden',
-      border: '1px solid rgba(207, 250, 254, 0.15)',
+      border: '1px solid rgba(0, 0, 0, 0.06)',
     }}>
 
       {/* ── 사이드바 ── */}
@@ -170,27 +154,27 @@ export default function App() {
         minWidth: isSidebarOpen ? '240px' : '0px',
         opacity: isSidebarOpen ? 1 : 0,
         pointerEvents: isSidebarOpen ? 'auto' : 'none',
-        backgroundColor: 'rgba(8, 16, 48, 0.6)',
-        backdropFilter: 'blur(30px)',
-        borderRight: isSidebarOpen ? '1px solid rgba(207, 250, 254, 0.08)' : 'none',
+        
+        /* 🤍 오프화이트 레이어 안개 굴절 효과 */
+        backgroundColor: 'rgba(244, 244, 246, 0.4)',
+        backdropFilter: 'blur(40px)',
+        borderRight: isSidebarOpen ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
         display: 'flex', flexDirection: 'column',
-        padding: isSidebarOpen ? '0' : '0',
         transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), min-width 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',
         zIndex: 10, overflow: 'hidden',
         flexShrink: 0,
       }}>
-        {/* 사이드바 내부 - 너비가 있을 때만 보임 */}
         <div style={{ width: '240px', height: '100%', display: 'flex', flexDirection: 'column', padding: '0 12px 20px', boxSizing: 'border-box' }}>
 
-          {/* 로고 - 신호등 버튼 아래로 배치 */}
+          {/* 로고 영역 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px', marginTop: '44px', marginBottom: '12px', flexShrink: 0 }}>
             <div style={{
               width: '28px', height: '28px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, #1e3a8a 0%, #06b6d4 100%)',
+              background: '#2D2D35',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.8rem', fontWeight: 'bold', color: '#cffafe', flexShrink: 0,
+              fontSize: '0.8rem', fontWeight: 'bold', color: '#F9F9FB', flexShrink: 0,
             }}>U</div>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(207,250,254,0.9)', whiteSpace: 'nowrap' }}>oxxultus</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#2D2D35', whiteSpace: 'nowrap' }}>oxxultus</span>
           </div>
 
           {/* 새 채팅 버튼 */}
@@ -199,13 +183,13 @@ export default function App() {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               width: '100%', padding: '10px 14px', borderRadius: '10px', marginBottom: '16px',
-              background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(30,58,138,0.25) 100%)',
-              border: '1px solid rgba(6,182,212,0.25)',
-              color: '#cffafe', fontSize: '0.85rem', fontWeight: 600,
+              background: 'rgba(0, 0, 0, 0.03)',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              color: '#2D2D35', fontSize: '0.85rem', fontWeight: 600,
               cursor: 'pointer', transition: 'all 0.15s ease', flexShrink: 0,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6,182,212,0.32) 0%, rgba(30,58,138,0.38) 100%)'; e.currentTarget.style.borderColor = 'rgba(6,182,212,0.45)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(30,58,138,0.25) 100%)'; e.currentTarget.style.borderColor = 'rgba(6,182,212,0.25)'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.06)'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.15)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.03)'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
           >
             <Icon.Plus /> 새 채팅
           </button>
@@ -214,7 +198,7 @@ export default function App() {
           {sessions.length > 0 && (
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', marginBottom: '12px' }}>
               <div style={{
-                fontSize: '0.68rem', fontWeight: 700, color: 'rgba(207,250,254,0.3)',
+                fontSize: '0.68rem', fontWeight: 700, color: '#9E9EAF',
                 textTransform: 'uppercase', letterSpacing: '0.1em',
                 padding: '0 6px', marginBottom: '6px',
               }}>채팅 기록</div>
@@ -228,11 +212,11 @@ export default function App() {
                       style={{
                         display: 'flex', alignItems: 'center', gap: '8px',
                         width: '100%', padding: '8px 10px', borderRadius: '8px',
-                        backgroundColor: isActive ? 'rgba(6,182,212,0.15)' : isHovered ? 'rgba(207,250,254,0.05)' : 'transparent',
-                        color: isActive ? '#cffafe' : 'rgba(207,250,254,0.6)',
-                        fontSize: '0.82rem', fontWeight: isActive ? 500 : 400,
+                        backgroundColor: isActive ? 'rgba(0, 0, 0, 0.04)' : isHovered ? 'rgba(0, 0, 0, 0.02)' : 'transparent',
+                        color: isActive ? '#2D2D35' : '#6E6E7A',
+                        fontSize: '0.82rem', fontWeight: isActive ? 600 : 400,
                         cursor: 'pointer',
-                        border: isActive ? '1px solid rgba(6,182,212,0.15)' : '1px solid transparent',
+                        border: isActive ? '1px solid rgba(0, 0, 0, 0.03)' : '1px solid transparent',
                         transition: 'all 0.12s ease', boxSizing: 'border-box',
                       }}
                       onClick={() => { setActiveSessionId(session.id); setCurrentView('chat'); }}
@@ -248,12 +232,12 @@ export default function App() {
                           onClick={(e) => handleDeleteSession(e, session.id)}
                           style={{
                             background: 'transparent', border: 'none',
-                            color: 'rgba(207,250,254,0.35)', cursor: 'pointer',
+                            color: '#9E9EAF', cursor: 'pointer',
                             padding: '2px', borderRadius: '4px', flexShrink: 0,
                             display: 'flex', alignItems: 'center', transition: 'color 0.1s',
                           }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
-                          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(207,250,254,0.35)')}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#9E9EAF')}
                           title="삭제"
                         ><Icon.Trash /></button>
                       )}
@@ -264,8 +248,7 @@ export default function App() {
             </div>
           )}
 
-          {/* 구분선 */}
-          <div style={{ height: '1px', background: 'rgba(207,250,254,0.07)', margin: '0 4px 12px', flexShrink: 0 }} />
+          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 4px 12px', flexShrink: 0 }} />
 
           {/* 내비게이션 메뉴 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
@@ -278,14 +261,14 @@ export default function App() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
                     width: '100%', padding: '10px 12px', borderRadius: '9px',
-                    backgroundColor: isActive ? 'rgba(6,182,212,0.15)' : 'transparent',
-                    color: isActive ? '#cffafe' : 'rgba(207,250,254,0.55)',
+                    backgroundColor: isActive ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
+                    color: isActive ? '#2D2D35' : '#6E6E7A',
                     fontSize: '0.85rem', fontWeight: isActive ? 600 : 400,
-                    border: isActive ? '1px solid rgba(6,182,212,0.18)' : '1px solid transparent',
+                    border: isActive ? '1px solid rgba(0, 0, 0, 0.02)' : '1px solid transparent',
                     cursor: 'pointer', transition: 'all 0.12s ease', textAlign: 'left',
                   }}
-                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(207,250,254,0.05)'; e.currentTarget.style.color = 'rgba(207,250,254,0.85)'; } }}
-                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(207,250,254,0.55)'; } }}
+                  onMouseEnter={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.02)'; e.currentTarget.style.color = '#2D2D35'; } }}
+                  onMouseLeave={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6E6E7A'; } }}
                 >
                   <span style={{ opacity: isActive ? 1 : 0.7, flexShrink: 0 }}><Ic /></span>
                   {label}
@@ -299,23 +282,22 @@ export default function App() {
       {/* ── 메인 영역 ── */}
       <div style={{
         flexGrow: 1, height: '100%', minWidth: 0,
-        backgroundColor: 'rgba(8, 18, 41, 0.3)',
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
         backdropFilter: 'blur(20px)',
         display: 'flex', flexDirection: 'column',
       }}>
-        {/* 드래그 헤더 - WebkitAppRegion: drag 는 div에만, 버튼은 별도로 no-drag */}
+        {/* 드래그 헤더 */}
         <div style={{
           height: '52px', minHeight: '52px', position: 'relative',
-          borderBottom: '1px solid rgba(207,250,254,0.06)',
-          backgroundColor: 'rgba(8,16,48,0.2)',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          backgroundColor: 'rgba(255, 255, 255, 0.3)',
           // @ts-ignore
           WebkitAppRegion: 'drag',
           display: 'flex', alignItems: 'center',
-          // 사이드바 닫혔을 때만 신호등 버튼(약 78px) 피해서 패딩
           paddingLeft: isSidebarOpen ? '16px' : '84px',
           paddingRight: '16px',
         }}>
-          {/* 토글 버튼 - no-drag 처리 필수 */}
+          {/* 토글 버튼 */}
           <div style={{
             // @ts-ignore
             WebkitAppRegion: 'no-drag',
@@ -323,37 +305,34 @@ export default function App() {
           }}>
             <button
               onClick={() => setIsSidebarOpen(prev => !prev)}
-              title={isSidebarOpen ? '사이드바 닫기 (Ctrl+B)' : '사이드바 열기 (Ctrl+B)'}
               style={{
-                background: 'rgba(207,250,254,0.06)', border: '1px solid rgba(207,250,254,0.1)',
-                color: 'rgba(207,250,254,0.7)', cursor: 'pointer',
+                background: 'rgba(0, 0, 0, 0.02)', border: '1px solid rgba(0, 0, 0, 0.05)',
+                color: '#6E6E7A', cursor: 'pointer',
                 padding: '6px 8px', borderRadius: '8px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.15s ease',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(207,250,254,0.12)'; e.currentTarget.style.color = '#cffafe'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(207,250,254,0.06)'; e.currentTarget.style.color = 'rgba(207,250,254,0.7)'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; e.currentTarget.style.color = '#2D2D35'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.02)'; e.currentTarget.style.color = '#6E6E7A'; }}
             >
               {isSidebarOpen ? <Icon.PanelClose /> : <Icon.PanelOpen />}
             </button>
           </div>
 
-          {/* 타이틀 - 드래그 영역 */}
+          {/* 타이틀 */}
           <div style={{
             position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-            fontSize: '0.82rem', fontWeight: 600, color: 'rgba(207,250,254,0.6)',
+            fontSize: '0.82rem', fontWeight: 600, color: '#6E6E7A',
             pointerEvents: 'none', whiteSpace: 'nowrap',
           }}>
-            {currentView === 'chat' && activeSessionId
-              ? (sessions.find(s => s.id === activeSessionId)?.title || 'AI 사랑해 Client')
-              : 'AI 사랑해 Client'}
+            AI 사랑해 Client
           </div>
         </div>
 
         {/* 뷰 컨텐츠 */}
         <div style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           {isLoading ? (
-            <div style={{ color: 'rgba(207,250,254,0.5)', fontSize: '0.9rem' }}>엔진 설정 로드 중...</div>
+            <div style={{ color: '#6E6E7A', fontSize: '0.9rem' }}>엔진 설정 로드 중...</div>
           ) : currentView === 'chat' ? (
             activeSessionId ? (
               <ChatView
@@ -362,23 +341,19 @@ export default function App() {
                 activeEngine={activeEngine}
                 onProviderChange={setActiveEngineId}
                 sessionId={activeSessionId}
-                onTitleUpdate={handleSessionTitleUpdate}
+                onTitleUpdate={loadSessions}
               />
             ) : (
-              <div style={{ textAlign: 'center', color: 'rgba(207,250,254,0.4)' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '16px', opacity: 0.4 }}>
-                  <Icon.Chat />
-                </div>
-                <div style={{ fontSize: '1rem', marginBottom: '8px', color: 'rgba(207,250,254,0.7)', fontWeight: 600 }}>새 채팅을 시작하세요</div>
-                <div style={{ fontSize: '0.82rem', marginBottom: '24px' }}>사이드바의 "새 채팅" 버튼을 클릭하세요</div>
+              <div style={{ textAlign: 'center', color: '#6E6E7A' }}>
+                <div style={{ fontSize: '1rem', marginBottom: '8px', color: '#2D2D35', fontWeight: 600 }}>새 채팅을 시작하세요</div>
                 <button
                   onClick={handleNewChat}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '8px',
                     padding: '10px 24px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, rgba(6,182,212,0.25) 0%, rgba(30,58,138,0.35) 100%)',
-                    border: '1px solid rgba(6,182,212,0.3)',
-                    color: '#cffafe', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+                    background: 'rgba(0, 0, 0, 0.03)',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    color: '#2D2D35', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
                   }}
                 ><Icon.Plus /> 새 채팅 시작</button>
               </div>
