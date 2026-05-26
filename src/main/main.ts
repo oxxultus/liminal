@@ -18,10 +18,24 @@ const ENG_PATH = isDev
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200, height: 800, frame: false, titleBarStyle: 'hiddenInset', 
-    transparent: true, hasShadow: true, 
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false }
+    width: 1200, 
+    height: 800, 
+    frame: false, 
+    titleBarStyle: 'hiddenInset', 
+    transparent: true, 
+    hasShadow: true, 
+    
+    icon: process.platform === 'win32' 
+      ? path.join(__dirname, '../../assets/icons/icon.ico') 
+      : path.join(__dirname, '../../assets/icons/icon.png'),
+      
+    webPreferences: { 
+      preload: path.join(__dirname, 'preload.js'), 
+      contextIsolation: true, 
+      nodeIntegration: false 
+    }
   });
+
   if (isDev) mainWindow.loadURL('http://localhost:5173');
   else mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 }

@@ -1,7 +1,7 @@
 {
-  "name": "mcp-client-electron",
+  "name": "liminal-desktop",
   "version": "1.0.0",
-  "description": "MCP Universal LLM Client with Electron & React",
+  "description": "다중 LLM 엔진과 MCP 플러그인을 하나의 워크스페이스에서 운용하는 AI 데스크탑 클라이언트",
   "main": "dist/main/main.js",
   "type": "commonjs",
   "scripts": {
@@ -11,11 +11,19 @@
     "build:renderer": "vite build",
     "build:main": "tsup src/main/main.ts src/main/preload.ts --out-dir dist/main --minify --external electron",
     "build": "npm run build:renderer && npm run build:main",
+    "package": "npm run build && electron-builder",
+    "build-icon": "electron-icon-builder --input=./src/renderer/assets/icon.png --output=./assets --flatten",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "electron",
+    "react",
+    "llm",
+    "mcp",
+    "ai-client"
+  ],
+  "author": "oxxultus",
+  "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
     "@google/genai": "^2.6.0",
@@ -42,9 +50,33 @@
     "cross-env": "^7.0.3",
     "electron": "^42.2.0",
     "electron-builder": "^26.8.1",
+    "electron-icon-builder": "^2.0.1",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.14",
     "vls": "^0.8.5"
+  },
+  "build": {
+    "appId": "com.oxxultus.liminal.desktop",
+    "productName": "Liminal Desktop",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icons/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icons/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icons"
+    }
   }
 }
