@@ -320,7 +320,7 @@ function registerIpcHandlers() {
     if (!mainWindow) return { canceled: true, filePaths: [] };
     return await dialog.showOpenDialog(mainWindow, {
       title: 'MCP 플러그인 JavaScript 스크립트 파일 선택',
-      filters: [{ name: 'JavaScript Files', extensions: ['js'] }],
+      filters: [{ name: 'JavaScript Files', extensions: ['mjs'] }],
       properties: ['openFile']
     });
   });
