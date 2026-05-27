@@ -11,6 +11,8 @@ permissions:
 jobs:
   release:
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -31,5 +33,5 @@ jobs:
       - name: Build and Publish Electron App
         run: npm run package
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
