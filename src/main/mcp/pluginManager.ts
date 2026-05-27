@@ -1,5 +1,6 @@
 // src/main/mcp/pluginManager.ts
 import * as path from 'path';
+import * as fs from 'fs'; // 💡 파일 유실 검증을 위한 fs 패키지 추가
 import { McpPlugin, PluginConfig } from './types';
 import { RemoteHttpMcpPlugin } from '../plugins/remotePlugin';
 import { Database } from 'sqlite';
@@ -13,13 +14,24 @@ export class McpPluginManager {
     this.db = db;
   }
 
-  // 앱 시작 시 DB에서 enabled 플러그인 전부 메모리에 올리기
+  // =========================================================================
+  // 💡 [안전 장치 추가] 앱 구동 시 실물 스크립트 파일 유실 여부 검증
+  // =========================================================================
   async loadPlugins(): Promise<void> {
     try {
       const configs: PluginConfig[] = await this.db.all(
         'SELECT * FROM mcp_plugins WHERE enabled = 1'
       );
+      
       for (const config of configs) {
+        // 'custom' 타입(스크립트 플러그인)인 경우, 저장된 경로에 파일이 실제로 존재하는지 체크
+        if (config.type === 'custom' && config.url) {
+          if (!fs.existsSync(config.url)) {
+            console.warn(`⚠️ [플러그인 복원 무시] 물리 파일이 존재하지 않아 로드를 스킵합니다: ${config.name} (${config.url})`);
+            continue; // 파일이 없다면 자식 프로세스 생성을 시도하지 않고 안전하게 패스
+          }
+        }
+
         await this.initializePlugin(config);
       }
       console.log('📦 플러그인 DB에서 로드 완료');
@@ -28,17 +40,14 @@ export class McpPluginManager {
     }
   }
 
-  // 새 플러그인 등록: 초기화 → 도구 검증 → DB 저장
   async registerNewPlugin(config: PluginConfig): Promise<any[]> {
-    const scriptPath = (config as any).scriptPath || config.url;
+    const scriptPath = config.url || (config as any).scriptPath;
     const workspaceDir = config.workspaceDir?.trim();
 
-    // 키워드 배열 → DB 저장용 문자열 변환
-    const keywordsStr = Array.isArray(config.keywords) 
-      ? config.keywords.join(',') 
+    const keywordsStr = Array.isArray(config.keywords)
+      ? config.keywords.join(',')
       : (config.keywords || '');
 
-    // 플러그인 초기화
     const plugin = await this.initializePlugin({
       ...config,
       url: scriptPath,
@@ -52,7 +61,6 @@ export class McpPluginManager {
       throw new Error('플러그인 연결 실패 또는 사용 가능한 도구가 없습니다.');
     }
 
-    // DB 저장 (UPSERT)
     await this.db.run(
       `INSERT INTO mcp_plugins (id, type, name, url, apiKey, workspaceDir, keywords, enabled)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
@@ -78,51 +86,74 @@ export class McpPluginManager {
     return tools;
   }
 
-  // 플러그인 목록 조회: DB에서 직접 읽기
   async getPluginsConfigList(): Promise<PluginConfig[]> {
     const rows = await this.db.all('SELECT * FROM mcp_plugins');
     return rows.map(r => ({
       ...r,
       enabled: r.enabled === 1,
-      keywords: r.keywords 
-        ? r.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) 
+      keywords: r.keywords
+        ? r.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
         : []
     }));
   }
 
-  // 플러그인 삭제
+  // src/main/mcp/pluginManager.ts 내부의 removePlugin 메서드 수정
   async removePlugin(pluginId: string): Promise<void> {
+    // 1. 메모리에서 구동 중인 자식 프로세스가 있다면 먼저 안전하게 종료
     const plugin = this.plugins.get(pluginId);
     if (plugin && typeof (plugin as StdioMcpPlugin).kill === 'function') {
       (plugin as StdioMcpPlugin).kill();
     }
     this.plugins.delete(pluginId);
+
+    try {
+      // 2. 💡 [신규 추가] DB에서 지우기 전에 해당 플러그인의 물리 파일 경로(url)를 가져옵니다.
+      const pluginConfig = await this.db.get(
+        'SELECT type, url FROM mcp_plugins WHERE id = ?',
+        [pluginId]
+      );
+
+      // 3. 💡 [신규 추가] 'custom' 타입이고 스크립트 파일이 실제로 존재한다면 디스크에서 삭제
+      if (pluginConfig && pluginConfig.type === 'custom' && pluginConfig.url) {
+        if (fs.existsSync(pluginConfig.url)) {
+          await fs.promises.unlink(pluginConfig.url);
+          console.log(`🗑️ 외부 플러그인 물리 스크립트 파일 삭제 완료: ${pluginConfig.url}`);
+        }
+      }
+    } catch (fileError) {
+      // 혹시나 파일이 이미 지워졌거나 권한 문제로 실패해도 DB 삭제는 진행되도록 예외 처리
+      console.error('⚠️ 플러그인 실물 파일 삭제 중 오류 발생:', fileError);
+    }
+
+    // 4. 데이터베이스에서 레코드 최종 제거
     await this.db.run('DELETE FROM mcp_plugins WHERE id = ?', [pluginId]);
+    console.log(`✅ 플러그인 레지스트리 제거 완료 (ID: ${pluginId})`);
   }
 
-  // 내부 인스턴스 생성 유틸리티
   private async initializePlugin(config: PluginConfig): Promise<McpPlugin> {
     if (config.type === 'remote') {
       if (!config.url) {
         throw new Error(`Remote 플러그인에 URL이 없습니다: ${config.name}`);
       }
-      return new RemoteHttpMcpPlugin(
-        config.id, 
-        config.name, 
-        config.url, 
+      const plugin = new RemoteHttpMcpPlugin(
+        config.id,
+        config.name,
+        config.url,
         config.apiKey || ''
       );
+      this.plugins.set(config.id, plugin);
+      return plugin;
     }
 
-    // local 또는 custom 타입 (workspaceDir은 선택사항)
-    const scriptPath = (config as any).scriptPath || config.url;
+    // custom 타입 (과거 local 영역 포함)
+    const scriptPath = config.url || (config as any).scriptPath;
     if (!scriptPath) {
       throw new Error(`스크립트 경로가 없습니다: ${config.name}`);
     }
 
-    const workspaceDir = config.workspaceDir?.trim() || undefined;
+    // 💡 main.ts 통합 등록단에서 지정해준 격리된 workspaceDir 세팅값을 우선 적용합니다.
+    const workspaceDir = config.workspaceDir?.trim() || path.dirname(scriptPath);
 
-    // StdioMcpPlugin 생성 (workspaceDir은 undefined일 수 있음)
     const plugin = new StdioMcpPlugin(
       config.id,
       config.name,
@@ -134,37 +165,29 @@ export class McpPluginManager {
     return plugin;
   }
 
-  /**
-   * LLM에게 전달할 도구 목록 (동적 필터링)
-   */
   async getAllToolsForLlm(userPrompt: string = ''): Promise<any[]> {
     const allTools: any[] = [];
     const lowerPrompt = userPrompt.toLowerCase().trim();
-    
+
     const configs = await this.getPluginsConfigList();
 
     for (const plugin of this.plugins.values()) {
       if (!plugin.enabled) continue;
 
       const config = configs.find(c => c.id === plugin.id);
-      
-      // DB에 저장된 사용자의 커스텀 오버라이딩 키워드
-      const dbKeywords = config?.keywords || [];
-      
-      // 💡 [수정 완료] mjs 파일 내부가 도구 목록(tools/list)을 반환할 때 함께 응답했던 고유 키워드 배열을 매핑
-      const scriptKeywords = (plugin as any).scriptKeywords || [];
 
-      // DB 저장 키워드와 파일 내장 키워드를 결합하여 중복 제거
+      const dbKeywords = config?.keywords || [];
+      const scriptKeywords = (plugin as any).scriptKeywords || [];
       const finalKeywords = Array.from(new Set([...dbKeywords, ...scriptKeywords]));
 
       let isMatched = false;
-      
+
       if (!lowerPrompt) {
-        isMatched = true;                    // 프롬프트가 없으면 모두 포함
+        isMatched = true;
       } else if (finalKeywords.length === 0) {
-        isMatched = true;                    // 키워드가 없으면 상시 활성화
+        isMatched = true;
       } else {
-        isMatched = finalKeywords.some(keyword => 
+        isMatched = finalKeywords.some(keyword =>
           lowerPrompt.includes(keyword.toLowerCase())
         );
       }
@@ -176,7 +199,7 @@ export class McpPluginManager {
 
       console.log(`🔥 [동적 필터] 포함: ${plugin.name}`);
       const tools = await plugin.listTools();
-      
+
       for (const tool of tools) {
         const rawName = tool.name || 'unknown_tool';
         const rawDescription = tool.description || '';
@@ -192,14 +215,11 @@ export class McpPluginManager {
         });
       }
     }
-    
+
     console.log(`🤖 LLM 주입용 최종 도구 목록 매핑 완료 (${allTools.length}개)`);
     return allTools;
   }
 
-  /**
-   * 도구 호출 라우팅 + 보안 확인
-   */
   async routeCallTool(fullToolName: string, args: Record<string, any>, mainWindow?: any) {
     let pluginId = '';
     if (fullToolName.includes('__')) {
@@ -221,13 +241,12 @@ export class McpPluginManager {
 
     const targetName = fullToolName.includes('__') ? fullToolName.split('__')[1] : fullToolName;
 
-    // 위험한 작업 시 사용자 승인 요청
     if (mainWindow && (targetName === 'write_text_file' || targetName === 'delete_file')) {
       const { dialog } = require('electron');
-      
+
       const rawContent = args.content || '(내용 없음)';
       const lines = rawContent.split('\n');
-      
+
       let processedContent = rawContent;
       if (lines.length > 7) {
         const topSeven = lines.slice(0, 5).join('\n');
@@ -256,9 +275,9 @@ export class McpPluginManager {
 
       if (userResponse.response === 1) {
         return {
-          content: [{ 
-            type: 'text', 
-            text: `❌ 사용자가 보안 정책으로 인해 도구(${targetName}) 실행을 거부했습니다.` 
+          content: [{
+            type: 'text',
+            text: `❌ 사용자가 보안 정책으로 인해 도구(${targetName}) 실행을 거부했습니다.`
           }]
         };
       }

@@ -47,7 +47,7 @@ export default function PluginsView() {
   const [menuOpenPluginId, setMenuOpenPluginId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 폼 입력 관리 유닛 상태
+  // 폼 입력 관리 유닛 상태 (UI 바인딩용 스위치는 'local' 유지, 백엔드에는 'custom'으로 정제 전송)
   const [pluginType, setPluginType] = useState<'remote' | 'custom' | 'local'>('remote');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -55,7 +55,7 @@ export default function PluginsView() {
   const [downloadUrl, setDownloadUrl] = useState('');
   const [customScriptPath, setCustomScriptPath] = useState('');
   
-  // 💡 작업 경로 선택 지정 스위치 및 경로 명세 상태
+  // 작업 경로 선택 지정 스위치 및 경로 명세 상태
   const [useWorkspace, setUseWorkspace] = useState(true);
   const [pluginWorkspaceDir, setPluginWorkspaceDir] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
@@ -125,7 +125,7 @@ export default function PluginsView() {
       name: name.trim(),
       url: targetPlugin.url || targetPlugin.scriptPath,
       apiKey: targetPlugin.apiKey,
-      workspaceDir: targetPlugin.workspaceDir, // 기존 유지 혹은 비어있음 유지
+      workspaceDir: targetPlugin.workspaceDir,
       keywords: parsedKeywords,
       enabled: true
     };
@@ -150,58 +150,57 @@ export default function PluginsView() {
       ? keywordsInput.split(',').map(k => k.trim()).filter(Boolean)
       : [];
 
-    // 체크박스가 꺼져있다면 공백 문자열 처리하여 백엔드가 undefined로 변환하게 함
     const finalWorkspaceDir = useWorkspace ? pluginWorkspaceDir.trim() : '';
+    const generatedId = `custom-${Date.now()}`;
 
-    if (pluginType === 'custom') {
-      if (!downloadUrl || !name || (useWorkspace && !finalWorkspaceDir)) { 
-        setStatusMsg('오류: 모든 필수 값을 기입해 주세요.'); 
-        return; 
+    const config: any = {
+      id: generatedId,
+      name: name.trim(),
+      keywords: parsedKeywords,
+      enabled: true
+    };
+
+    if (pluginType === 'remote') {
+      config.type = 'remote';
+      config.url = url.trim();
+      config.apiKey = apiKey.trim();
+    } else {
+      config.type = 'custom';
+      config.workspaceDir = useWorkspace ? finalWorkspaceDir : undefined;
+      
+      if (pluginType === 'custom') {
+        if (!downloadUrl || !name || (useWorkspace && !finalWorkspaceDir)) {
+          setStatusMsg('오류: 모든 필수 값을 기입해 주세요.');
+          return;
+        }
+        config.url = downloadUrl.trim();
+      } else {
+        if (!customScriptPath || !name || (useWorkspace && !finalWorkspaceDir)) {
+          setStatusMsg('오류: 모든 필수 값을 기입해 주세요.');
+          return;
+        }
+        config.url = customScriptPath.trim();
       }
-      try {
-        const res = await window.electronAPI.downloadPlugin({ 
-          downloadUrl, 
-          aliasName: name, 
-          workspaceDir: useWorkspace ? finalWorkspaceDir : undefined, 
-          keywords: parsedKeywords 
-        } as any); 
-        if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
-      } catch (err: any) { setStatusMsg(`시스템 오류: ${err.message}`); }
-      return;
     }
 
-    if (pluginType === 'local') {
-      if (!customScriptPath || !name || (useWorkspace && !finalWorkspaceDir)) { 
-        setStatusMsg('오류: 모든 필수 값을 기입해 주세요.'); 
-        return; 
-      }
-      const config = { 
-        id: `plugin-${Date.now()}`, 
-        type: 'custom' as any, 
-        name, 
-        enabled: true, 
-        scriptPath: customScriptPath, 
-        workspaceDir: useWorkspace ? finalWorkspaceDir : undefined, 
-        keywords: parsedKeywords 
-      };
-      try {
-        const res = await window.electronAPI.addMcpPlugin(config);
-        if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
-      } catch (err: any) { setStatusMsg(`시스템 오류: ${err.message}`); }
-      return;
-    }
-
-    const config = { id: `plugin-${Date.now()}`, type: pluginType as any, name, enabled: true, url, apiKey, keywords: parsedKeywords };
     try {
       const res = await window.electronAPI.addMcpPlugin(config);
-      if (res.success) { resetForm(); refreshPluginsList(); } else { setStatusMsg(`오류: ${res.error}`); }
-    } catch (err: any) { setStatusMsg(`시스템 오류: ${err.message}`); }
+      if (res.success) {
+        resetForm();
+        refreshPluginsList();
+      } else {
+        setStatusMsg(`오류: ${res.error}`);
+      }
+    } catch (err: any) {
+      setStatusMsg(`시스템 오류: ${err.message}`);
+    }
   };
 
   const resetForm = () => {
     setName(''); setUrl(''); setApiKey(''); setDownloadUrl('');
     setCustomScriptPath(''); setPluginWorkspaceDir(''); setKeywordsInput('');
-    setUseWorkspace(true); // 플러그인 추가 모달 리셋 시 체크박스 기본 켜짐 초기화
+    setPluginType('remote');
+    setUseWorkspace(true);
     setStatusMsg(''); setIsAddModalOpen(false);
   };
 
@@ -265,7 +264,8 @@ export default function PluginsView() {
               🔌 장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            // 💡 [수정] Grid Item들이 자식의 고유 너비 때문에 늘어나는 것을 제어하기 위해 grid-template-columns에 minmax(0, 1fr) 규격 부여
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
               {installedPlugins.map((p) => {
                 const isRemote = p.type === 'remote';
                 const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
@@ -280,7 +280,8 @@ export default function PluginsView() {
                       background: 'var(--bg-glass-card)', border: 'var(--border-glass)',
                       borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
                       gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
-                      height: '135px', boxSizing: 'border-box'
+                      height: '135px', boxSizing: 'border-box',
+                      minWidth: 0 // 💡 [수정] 부모 flex 컨테이너가 축소 가능하도록 minWidth 해제
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -295,16 +296,30 @@ export default function PluginsView() {
                       </span>
                     </div>
 
-                    <div style={{ flexGrow: 1, minWidth: 0 }}>
+                    {/* 중간 내용 영역 명확히 미니멈 영역 확보 */}
+                    <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {isRemote ? 'Endpoint Connection' : 'Local Workspace'}
                       </div>
-                      <div style={{ 
-                        fontSize: '0.82rem', color: 'var(--color-text-main)', fontFamily: 'monospace', 
-                        marginTop: '2px', wordBreak: 'break-all', whiteSpace: 'nowrap', 
-                        overflow: 'hidden', textOverflow: 'ellipsis' 
-                      }} title={isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '지정되지 않음 (제한 없음)')}>
-                        {isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '🔓 지정되지 않음 (제한 없음)')}
+                      
+                      {/* 가로 스크롤바가 숨겨진 채 정상 작동하도록 최적화 처리 */}
+                      <div style={{ width: '100%', overflow: 'hidden', minWidth: 0 }}>
+                        <div 
+                          style={{ 
+                            fontSize: '0.82rem', 
+                            color: 'var(--color-text-main)', 
+                            fontFamily: 'monospace', 
+                            marginTop: '2px', 
+                            wordBreak: 'keep-all', 
+                            whiteSpace: 'nowrap', 
+                            overflowX: 'auto', 
+                            maxWidth: '100%',
+                            paddingBottom: '4px'
+                          }} 
+                          title={isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '지정되지 않음 (제한 없음)')}
+                        >
+                          {isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '🔓 지정되지 않음 (제한 없음)')}
+                        </div>
                       </div>
                     </div>
 
@@ -323,7 +338,7 @@ export default function PluginsView() {
                           background: 'transparent', border: 'none',
                           color: menuOpenPluginId === p.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
                           cursor: 'pointer', padding: '4px', borderRadius: '4px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', //  대문자 C로 변경
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
                           zIndex: 10
                         }}
                         onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
@@ -452,7 +467,7 @@ export default function PluginsView() {
                       </div>
                     )}
 
-                    {/* 💡 체크박스를 토글하여 작업 공간 주입을 선택적으로 제어하는 유닛 블록 */}
+                    {/* 체크박스를 토글하여 작업 공간 주입을 선택적으로 제어하는 유닛 블록 */}
                     <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
                         <input 
@@ -460,7 +475,7 @@ export default function PluginsView() {
                           checked={useWorkspace} 
                           onChange={(e) => {
                             setUseWorkspace(e.target.checked);
-                            if(!e.target.checked) setPluginWorkspaceDir(''); // 체크 해제 시 명세 비우기
+                            if(!e.target.checked) setPluginWorkspaceDir('');
                           }}
                           style={{ cursor: 'pointer', width: '15px', height: '15px' }}
                         />
@@ -491,7 +506,7 @@ export default function PluginsView() {
                     취소
                   </button>
                   <button type="submit" style={{ padding: '9px 16px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
-                    {pluginType === 'local' ? 'Link & Activate' : 'Activate'}
+                    Activate
                   </button>
                 </div>
               </form>
