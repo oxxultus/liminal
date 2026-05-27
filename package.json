@@ -66,6 +66,13 @@
       "dist/**/*",
       "package.json"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "oxxultus",
+        "repo": "liminal-desktop" 
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "assets/icons/icon.ico"

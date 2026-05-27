@@ -69,7 +69,7 @@ Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단�
 
 | 항목 | 요구 버전 |
 |---|---|
-| Node.js | 20.x 이상 |
+| Node.js | 22.x 이상 |
 | Electron | 28.x 이상 |
 | npm | 9.x 이상 |
 

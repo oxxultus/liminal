@@ -1,0 +1,33 @@
+name: Build and Release Liminal Desktop
+
+on:
+  push:
+    tags:
+      - 'v*' # v1.0.0, v1.0.1 같은 태그가 푸시될 때만 빌드 및 배포 트리거
+
+jobs:
+  release:
+    runs-on: macos-latest # 맥용 (.dmg) 빌드를 위해 macOS 가상 환경 사용
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-cache: 'npm'
+          node-version: 22 # 💡 로컬 개발 환경인 Node 22 버전과 일치시킵니다.
+
+      - name: Install Dependencies
+        run: npm ci # package-lock.json 기반의 깨끗한 격리 설치
+
+      - name: Generate Application Icons
+        run: npm run build-icon # assets/icons 생성 보장
+
+      - name: Build and Publish Electron App
+        # CSC_IDENTITY_AUTO_DISCOVERY=false 설정으로 개발자 인증서가 없어도 패키징 단계 통과 유도
+        run: npm run package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
