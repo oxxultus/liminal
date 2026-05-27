@@ -76,7 +76,6 @@ const Icon = {
       <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
     </svg>
   ),
-  // 💡 [테마 아이콘 추가] 해/달 토글 스위치용 SVG
   Sun: () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.36" x2="5.64" y2="17.94"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
@@ -109,7 +108,7 @@ export default function App() {
   const [targetRenameSessionId, setTargetRenameSessionId] = useState<string | null>(null);
   const [editTitleInput, setEditTitleInput] = useState<string>('');
 
-  // 💡 [신규 추가] 다크모드 영속성 제어 스위치 (기본값 로컬스토리지 연동)
+  // 다크모드 영속성 제어 스위치
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark';
   });
@@ -134,7 +133,7 @@ export default function App() {
 
   useEffect(() => { loadEngines(); loadSessions(); }, []);
 
-  // 💡 [신규 추가] 테마 상태 바뀔 때마다 최상위 document 노드에 다크모드 클래스 및 CSS 변수 바인딩
+  // 테마 상태 관리 동기화
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.setAttribute('data-theme', 'dark');
@@ -145,7 +144,7 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // 외부 클릭 시 컨텍스트 메뉴 닫기 유틸리티
+  // 컨텍스트 바깥 클릭 감증 유틸
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -227,16 +226,14 @@ export default function App() {
   return (
     <div style={{
       display: 'flex', width: '100vw', height: '100vh',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      
-      // 💡 [테마 연동 가변 색상 제어]
+      // 💡 [수정] 아래의 인라인 단일 폰트 지정을 거두고, 클래스 상속 스택을 타고 내려가도록 세팅 제거
       color: isDarkMode ? '#EAEAEF' : '#2D2D35',
       background: isDarkMode 
         ? 'linear-gradient(135deg, #16161A 0%, #1A1A22 50%, #121216 100%)' 
         : 'linear-gradient(135deg, #F9F9FB 0%, #F4F4F6 50%, #EAEAEF 100%)',
       position: 'relative', borderRadius: '14px', overflow: 'hidden',
       border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid rgba(0, 0, 0, 0.06)',
-    }}>
+    }} className="app-container">
 
       {/* ── 사이드바 ── */}
       <div style={{
@@ -244,7 +241,6 @@ export default function App() {
         minWidth: isSidebarOpen ? '240px' : '0px',
         opacity: isSidebarOpen ? 1 : 0,
         pointerEvents: isSidebarOpen ? 'auto' : 'none',
-        // 💡 다크 모드 시 투명 어두운 안개 글래스 이식
         backgroundColor: isDarkMode ? 'rgba(22, 22, 26, 0.45)' : 'rgba(244, 244, 246, 0.4)',
         backdropFilter: 'blur(40px)',
         borderRight: isSidebarOpen ? (isDarkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0, 0, 0, 0.05)') : 'none',
@@ -413,7 +409,7 @@ export default function App() {
               {isSidebarOpen ? <Icon.PanelClose /> : <Icon.PanelOpen />}
             </button>
 
-            {/* 💡 [테마 전환 스위치 단추 심기] */}
+            {/* 테마 전환 스위치 단추 */}
             <button
               onClick={() => setIsDarkMode(prev => !prev)}
               title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
@@ -586,9 +582,18 @@ export default function App() {
         </div>
       )}
 
-      {/* 전역 테마 주입을 위한 CSS Variables 스타일시트 하이재킹 */}
+      {/* ── 전역 테마 및 폰트 인프라 주입을 위한 CSS 하이재킹 ── */}
       <style>{`
-        /* 💡 다크모드 시 자식 하위 뷰들이 가져다 쓸 전역 CSS 테마 변수 구축 */
+        /* 💡 [폰트 설정 통합] 가독성이 높은 Pretendard 웹폰트 스택 정의 */
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
+        * {
+          font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* 다크모드 시 자식 하위 뷰들이 가져다 쓸 전역 CSS 테마 변수 구축 */
         :root[data-theme='dark'] {
           --bg-glass-card: linear-gradient(135deg, rgba(30, 30, 38, 0.55) 0%, rgba(20, 20, 25, 0.35) 100%);
           --border-glass: 1px solid rgba(255, 255, 255, 0.06);
@@ -596,7 +601,6 @@ export default function App() {
           --color-text-main: #EAEAEF;
           --color-text-muted: #9E9EAF;
           --bg-bubble-bot: rgba(30, 30, 38, 0.7);
-          /* ↓ 추가 */
           --bg-modal: rgba(28, 28, 36, 0.98);
           --border-glass-input: rgba(255, 255, 255, 0.14);
           --color-btn-text: #16161A;
@@ -608,7 +612,6 @@ export default function App() {
           --color-text-main: #111111;
           --color-text-muted: #6E6E7A;
           --bg-bubble-bot: rgba(255, 255, 255, 0.65);
-          /* ↓ 추가 */
           --bg-modal: rgba(255, 255, 255, 0.97);
           --border-glass-input: rgba(0, 0, 0, 0.12);
           --color-btn-text: #F9F9FB;
