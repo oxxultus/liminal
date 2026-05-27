@@ -36,4 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openFileDialog: () => ipcRenderer.invoke('mcp:open-file-dialog'),
   uploadPlugin: (payload: any) => ipcRenderer.invoke('mcp:upload-plugin', payload),
+
+  // =========================================================================
+  // 💡 [신규 추가] 원격 서버 플러그인의 실시간 활성화 상태 체크 (Online/Offline 스캔용)
+  // =========================================================================
+  checkRemoteStatus: (payload: { url: string; apiKey: string }) => ipcRenderer.invoke('mcp:check-remote-status', payload),
 });

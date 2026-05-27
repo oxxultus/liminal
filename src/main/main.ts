@@ -375,6 +375,22 @@ function registerIpcHandlers() {
       properties: ['openFile']
     });
   });
+
+  // src/main/main.ts - 관련 핸들러 수정
+    ipcMain.handle('mcp:check-remote-status', async (_, { url, apiKey }) => {
+    try {
+      const axios = require('axios'); // 상단 임포트가 이미 있다면 생략 가능
+      
+      // FastAPI 서버 보안 인터셉터를 정상 통과하도록 X-API-KEY 주입
+      await axios.get(`${url}/api/v1/tools`, { 
+        headers: { 'X-API-KEY': apiKey || '' },
+        timeout: 3000 // 상태 스캔용이므로 3초 타임아웃
+      });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  });
 }
 
 const migrateEngines = async () => {

@@ -40,6 +40,7 @@ export class RemoteHttpMcpPlugin implements McpPlugin {
         inputSchema: tool.inputSchema || tool.parameters || { type: 'object', properties: {} }
       }));
     } catch (error: any) {
+      // 💡 앱 초기화 유연성을 위해 크래시를 내지 않고 네트워크 상태만 콘솔에 조용히 기록합니다.
       console.error(`[${this.name}] 원격 도구 목록 가져오기 실패:`, error.message);
       return [];
     }
@@ -67,9 +68,16 @@ export class RemoteHttpMcpPlugin implements McpPlugin {
     } catch (error: any) {
       console.error(`[${this.name}] callTool 원격 전송 오류:`, error.message);
 
-      // 💡 원격 서버(FastAPI 등)에서 보낸 세부 에러 바디가 있다면 추출하여 AI에 전달
       let serverErrorMessage = error.message;
-      if (error.response?.data?.detail) {
+
+      // 💡 [네트워크 레이어 에러 정밀 인터셉트]
+      // 서버가 꺼져있거나, 도메인 오타, 혹은 타임아웃이 났을 때 구체적인 에러 안내 제공
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        serverErrorMessage = "원격 서버와 통신할 수 없습니다. 서버 가동 상태 또는 URL 경로를 확인해 주세요.";
+      } else if (error.code === 'ETIMEDOUT' || error.code === 'TIMEOUT') {
+        serverErrorMessage = "원격 서버가 15초 이내에 응답하지 않아 타임아웃 처리되었습니다.";
+      } else if (error.response?.data?.detail) {
+        // 원격 서버(FastAPI 등)에서 보낸 세부 에러 바디가 있다면 추출
         serverErrorMessage = typeof error.response.data.detail === 'string'
           ? error.response.data.detail
           : JSON.stringify(error.response.data.detail);
@@ -77,8 +85,12 @@ export class RemoteHttpMcpPlugin implements McpPlugin {
         serverErrorMessage = error.response.data.message;
       }
 
+      // 💡 에러 구조체 포맷을 랩핑하여 AI가 대화창에서 유연하게 "죄송합니다, 원격 서버 에러로 인해~" 형태로 대응할 수 있게 토스
       return {
-        content: [{ type: 'text', text: `❌ 원격 제어 실패 (${this.name}): ${serverErrorMessage}` }]
+        content: [{ 
+          type: 'text', 
+          text: `❌ 원격 플러그인 제어 실패 (${this.name}): ${serverErrorMessage}` 
+        }]
       };
     }
   }

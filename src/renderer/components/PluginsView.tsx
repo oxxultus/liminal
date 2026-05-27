@@ -39,6 +39,9 @@ export default function PluginsView() {
   const [statusMsg, setStatusMsg] = useState('');
   const [hoveredPluginId, setHoveredPluginId] = useState<string | null>(null);
 
+  // 💡 [신규] 원격 서버 플러그인들의 활성화 상태를 관리하는 상태 맵
+  const [onlineStates, setOnlineStates] = useState<Record<string, boolean>>({});
+
   // 모달 제어 상태 스위치
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
@@ -63,9 +66,33 @@ export default function PluginsView() {
   // 수정 타겟팅 포인터
   const [targetPluginId, setTargetPluginId] = useState<string | null>(null);
 
+  // 💡 [신규] 원격 플러그인들의 헬스 상태를 비동기로 스캔하는 유틸리티
+  const checkRemotePluginsHealth = async (plugins: any[]) => {
+    const remotePlugins = plugins.filter(p => p.type === 'remote');
+    const results: Record<string, boolean> = {};
+
+    await Promise.all(
+      remotePlugins.map(async (p) => {
+        // 💡 url뿐만 아니라 플러그인 명세에 내장된 apiKey도 함께 추출하여 전달
+        if (p.url && window.electronAPI.checkRemoteStatus) {
+          const isOnline = await window.electronAPI.checkRemoteStatus({ 
+            url: p.url, 
+            apiKey: p.apiKey || '' 
+          });
+          results[p.id] = isOnline;
+        }
+      })
+    );
+
+  setOnlineStates(prev => ({ ...prev, ...results }));
+};
+
   const refreshPluginsList = async () => {
     const list = await window.electronAPI.getMcpPluginsList();
     setInstalledPlugins(list || []);
+    if (list && list.length > 0) {
+      checkRemotePluginsHealth(list); // 목록 갱신 시 상태 스캔 가동
+    }
   };
 
   useEffect(() => { refreshPluginsList(); }, []);
@@ -264,13 +291,15 @@ export default function PluginsView() {
               🔌 장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
             </div>
           ) : (
-            // 💡 [수정] Grid Item들이 자식의 고유 너비 때문에 늘어나는 것을 제어하기 위해 grid-template-columns에 minmax(0, 1fr) 규격 부여
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
               {installedPlugins.map((p) => {
                 const isRemote = p.type === 'remote';
                 const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
                 const hasWorkspace = p.workspaceDir && p.workspaceDir.trim().length > 0;
                 
+                // 💡 [신규] 원격 서버 플러그인용 상태 분석 유닛 추출
+                const isServerOnline = onlineStates[p.id] ?? false;
+
                 return (
                   <div 
                     key={p.id}
@@ -281,19 +310,47 @@ export default function PluginsView() {
                       borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
                       gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
                       height: '135px', boxSizing: 'border-box',
-                      minWidth: 0 // 💡 [수정] 부모 flex 컨테이너가 축소 가능하도록 minWidth 해제
+                      minWidth: 0 
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '65%' }}>
                         <span style={{ color: 'var(--color-text-muted)', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
                           {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
                         </span>
                         <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)' }}>{p.name}</span>
                       </div>
-                      <span style={getBadgeTypeStyle(p.type)}>
-                        {p.type}
-                      </span>
+                      
+                      {/* 💡 [수정] 타입 배지 왼쪽에 동적 헬스 체크 인디케이터 심기 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {isRemote && (
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '4px',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            color: isServerOnline ? '#10b981' : '#6e6e7a',
+                            backgroundColor: isServerOnline ? 'rgba(16, 185, 129, 0.08)' : 'rgba(110, 110, 122, 0.08)',
+                            padding: '3px 6px',
+                            borderRadius: '5px',
+                            border: isServerOnline ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(110, 110, 122, 0.15)'
+                          }}>
+                            <span style={{ 
+                              width: '5px', 
+                              height: '5px', 
+                              borderRadius: '50%', 
+                              backgroundColor: isServerOnline ? '#10b981' : '#6e6e7a',
+                              display: 'inline-block',
+                              boxShadow: isServerOnline ? '0 0 6px #10b981' : 'none'
+                            }} />
+                            {isServerOnline ? 'ONLINE' : 'OFFLINE'}
+                          </div>
+                        )}
+                        <span style={getBadgeTypeStyle(p.type)}>
+                          {p.type}
+                        </span>
+                      </div>
                     </div>
 
                     {/* 중간 내용 영역 명확히 미니멈 영역 확보 */}
@@ -302,7 +359,6 @@ export default function PluginsView() {
                         {isRemote ? 'Endpoint Connection' : 'Local Workspace'}
                       </div>
                       
-                      {/* 가로 스크롤바가 숨겨진 채 정상 작동하도록 최적화 처리 */}
                       <div style={{ width: '100%', overflow: 'hidden', minWidth: 0 }}>
                         <div 
                           style={{ 
