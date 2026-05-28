@@ -5,8 +5,8 @@ import { EngineConfig } from '../App';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-// 💡 다크 모드와 라이트 모드 코드창의 명도 대비를 위해 두 테마를 모두 임포트합니다.
 import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChatViewProps {
   engines: EngineConfig[];
@@ -19,14 +19,22 @@ interface ChatViewProps {
 
 interface Message {
   id: string;
-  sender: 'user' | 'bot' | 'system';
+  sender: 'user' | 'bot';
   text: string;
 }
 
 interface SlashCommand {
   command: string;
   description: string;
-  icon: string;
+  iconType: 'clear' | 'summary' | 'engine' | 'plugins' | 'help';
+}
+
+// 💡 [구조 확장] 단순 텍스트 출력을 넘어, 토스트 자체에 플러그인 리스트 객체를 직접 넘길 수 있도록 사양 정의
+interface SystemToast {
+  id: string;
+  type: 'info' | 'plugins_report';
+  text?: string;
+  pluginList?: any[]; // /plugins 커맨드 대응용 원천 데이터 소켓
 }
 
 function generateId() {
@@ -37,12 +45,46 @@ const SUMMARY_TRIGGER = 20;
 const KEEP_RECENT = 6;
 
 const SLASH_COMMANDS: SlashCommand[] = [
-  { command: '/clear',   description: '현재 채팅 화면 초기화',        icon: '🗑️' },
-  { command: '/summary', description: '현재 대화 요약 보기',           icon: '📋' },
-  { command: '/engine',  description: '사용 중인 엔진 정보 보기',      icon: '⚙️' },
-  { command: '/plugins', description: '활성화된 플러그인 목록 보기',   icon: '🔌' },
-  { command: '/help',    description: '사용 가능한 커맨드 목록',       icon: '❓' },
+  { command: '/clear',   description: '현재 채팅 화면 초기화',        iconType: 'clear' },
+  { command: '/summary', description: '현재 대화 요약 보기',           iconType: 'summary' },
+  { command: '/engine',  description: '사용 중인 엔진 정보 보기',      iconType: 'engine' },
+  { command: '/plugins', description: '활성화된 플러그인 목록 보기',   iconType: 'plugins' },
+  { command: '/help',    description: '사용 가능한 커맨드 목록',       iconType: 'help' },
 ];
+
+const SvgIcon = {
+  clear: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+    </svg>
+  ),
+  summary: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+    </svg>
+  ),
+  engine: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  ),
+  plugins: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+    </svg>
+  ),
+  help: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  ),
+  info: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', marginTop: '1px', flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+    </svg>
+  )
+};
 
 export default function ChatView({ engines, activeEngine, onProviderChange, sessionId, currentTitle = '새 채팅', onTitleUpdate }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -52,22 +94,22 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isSummarizing, setIsSummarizing] = useState(false);
 
-  // 💡 실시간 코드창 테마 스위칭을 위해 렌더러단의 다크모드 활성화 상태를 감지합니다.
+  const [toasts, setToasts] = useState<SystemToast[]>([]);
+
   const [isDark, setIsDark] = useState(() => document.documentElement.getAttribute('data-theme') === 'dark');
 
-  // 슬래시 커맨드 관련 state
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
 
   const filteredCommands = SLASH_COMMANDS.filter(c =>
     c.command.includes(slashFilter.toLowerCase())
   );
 
-  // 전역 DOM의 테마 가동 스위치 변경 리스너 바인딩
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
@@ -76,7 +118,6 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     return () => observer.disconnect();
   }, []);
 
-  // 세션 변경 시 히스토리 + 요약본 로드
   useEffect(() => {
     const loadHistory = async () => {
       setIsLoadingHistory(true);
@@ -89,11 +130,13 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
         ]);
 
         if (history && history.length > 0) {
-          const uiMessages: Message[] = history.map((m: any) => ({
-            id: m.id,
-            sender: m.role === 'user' ? 'user' : m.role === 'assistant' ? 'bot' : 'system',
-            text: m.content,
-          }));
+          const uiMessages: Message[] = history
+            .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+            .map((m: any) => ({
+              id: m.id,
+              sender: m.role === 'user' ? 'user' : 'bot',
+              text: m.content,
+            }));
           setMessages(uiMessages);
 
           let apiHistory: any[] = [];
@@ -127,15 +170,36 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     loadHistory();
   }, [sessionId]);
 
+  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
+    if (feedRef.current) {
+      feedRef.current.scrollTo({
+        top: feedRef.current.scrollHeight,
+        behavior
+      });
+    }
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    scrollToBottom('smooth');
+  }, [messages, loading]);
 
   useEffect(() => {
     const handleClick = () => setShowSlashMenu(false);
     if (showSlashMenu) document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showSlashMenu]);
+
+  // 💡 [사양 확장 개조] 이제 텍스트 외에도 구조화 데이터(pluginList)를 받아올 수 있도록 모듈 탑재
+  const triggerSystemToast = (text: string, type: SystemToast['type'] = 'info', pluginList?: any[]) => {
+    const toastId = generateId();
+    setToasts(prev => [...prev, { id: toastId, type, text, pluginList }]);
+    
+    // 리포트 확인 효율을 위해 플러그인 리스트 뷰는 12초간 상공 대기 처리
+    const timeoutDuration = type === 'plugins_report' ? 12000 : 8000;
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== toastId));
+    }, timeoutDuration);
+  };
 
   const saveMessage = async (role: 'user' | 'assistant' | 'system', content: string) => {
     const id = generateId();
@@ -157,18 +221,16 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
       case '/clear':
         setMessages([{
           id: generateId(), sender: 'bot',
-          text: `채팅이 초기화되었습니다. ${activeEngine?.name ?? 'AI'}와 새로운 대화를 시작하세요.`,
+          text: `채팅 화면이 청소되었습니다. 새로운 대화를 시작하세요.`,
         }]);
         setApiConversation([]);
+        triggerSystemToast('채팅 화면 및 대화 세션 컨텍스트가 초기화되었습니다.');
         break;
 
       case '/summary': {
         const summaryRow = await window.electronAPI.getSummary(sessionId).catch(() => null);
         if (summaryRow) {
-          setMessages(prev => [...prev, {
-            id: generateId(), sender: 'system',
-            text: `📋 [저장된 요약]\n${summaryRow.summary}`,
-          }]);
+          triggerSystemToast(`저장된 동적 대화 요약본 명세:\n\n${summaryRow.summary}`);
         } else if (apiConversation.length > 0) {
           setIsSummarizing(true);
           try {
@@ -177,56 +239,46 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
               apiKey: activeEngine.apiKey,
               messages: [
                 ...apiConversation,
-                { role: 'user', content: '지금까지의 대화를 5문장 이내로 요약해줘. 요약문만 출력해.' },
+                { role: 'user', content: '지금까지의 대화를 핵심 위주로 3문장 이내로 요약해줘. 요약문만 출력해.' },
               ],
             });
             const text = res.data?.text ?? '요약 실패';
-            setMessages(prev => [...prev, { id: generateId(), sender: 'system', text: `📋 [즉석 요약]\n${text}` }]);
+            triggerSystemToast(`실시간 컴프레션 대화 요약 결과:\n\n${text}`);
           } finally {
             setIsSummarizing(false);
           }
         } else {
-          setMessages(prev => [...prev, { id: generateId(), sender: 'system', text: '📋 요약할 대화 내용이 없습니다.' }]);
+          triggerSystemToast('요약 파싱을 실행할 누적 대화 기록이 존재하지 않습니다.');
         }
         break;
       }
 
       case '/engine':
-        setMessages(prev => [...prev, {
-          id: generateId(), sender: 'system',
-          text: `⚙️ [현재 엔진 정보]\n` +
-                `이름: ${activeEngine?.name}\n` +
-                `Provider: ${activeEngine?.provider}\n` +
-                `모델: ${activeEngine?.model}\n` +
-                `대화 히스토리: ${apiConversation.filter(m => m.role === 'user' || m.role === 'assistant').length}개`,
-        }]);
+        triggerSystemToast(
+          `현재 연동된 LLM 가동 명세\n` +
+          `• 코어 엔진: ${activeEngine?.name}\n` +
+          `• 프로바이더: ${activeEngine?.provider}\n` +
+          `• 모델 식별자: ${activeEngine?.model}\n` +
+          `• 활성 컨텍스트: ${apiConversation.filter(m => m.role === 'user' || m.role === 'assistant').length}개 레코드`
+        );
         break;
 
       case '/plugins': {
         const pluginList = await window.electronAPI.getMcpPluginsList().catch(() => []);
         if (pluginList.length === 0) {
-          setMessages(prev => [...prev, {
-            id: generateId(), sender: 'system',
-            text: '🔌 활성화된 플러그인이 없습니다.\nPlugin Manager에서 플러그인을 추가하세요.',
-          }]);
+          triggerSystemToast('장착되어 가동 중인 외부 MCP 플러그인 생태계가 공백 상태입니다.');
         } else {
-          const lines = pluginList.map((p: any) =>
-            `${p.enabled ? '🟢' : '🔴'} ${p.name}  (${p.type === 'remote' ? '원격' : '로컬'})`
-          ).join('\n');
-          setMessages(prev => [...prev, {
-            id: generateId(), sender: 'system',
-            text: `🔌 [플러그인 목록 — ${pluginList.length}개]\n${lines}`,
-          }]);
+          // 💡 [대변혁] 문자열 정렬 조립을 중단하고 원천 데이터 배열을 토스트 서브 모듈로 직접 주입 우회
+          triggerSystemToast('', 'plugins_report', pluginList);
         }
         break;
       }
 
       case '/help':
-        setMessages(prev => [...prev, {
-          id: generateId(), sender: 'system',
-          text: `❓ [사용 가능한 커맨드]\n` +
-                SLASH_COMMANDS.map(c => `${c.icon} ${c.command}  —  ${c.description}`).join('\n'),
-        }]);
+        triggerSystemToast(
+          `MCP 터미널 제어 커맨드 구조 안내\n\n` +
+          SLASH_COMMANDS.map(c => `${c.command}   —   ${c.description}`).join('\n')
+        );
         break;
     }
   };
@@ -397,110 +449,231 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
     }
   };
 
+  const DynamicIcon = ({ type }: { type: SlashCommand['iconType'] }) => {
+    const Component = SvgIcon[type];
+    return <Component />;
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: 'transparent', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: 'transparent', overflow: 'hidden', position: 'relative', boxSizing: 'border-box' }}>
+
+      {/* 우측 상단 토스트 팝업 컨테이너 레이어 */}
+      <div style={{ position: 'absolute', top: '24px', right: '24px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 10001, width: '360px', pointerEvents: 'none' }}>
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 30, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 20, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 26 }}
+              style={{
+                pointerEvents: 'auto',
+                background: 'var(--bg-bubble-bot)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
+                border: 'var(--border-glass)',
+                borderRadius: '14px',
+                padding: '14px 16px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                color: 'var(--color-text-main)',
+                fontSize: '0.85rem',
+                fontWeight: 500,
+                lineHeight: 1.5,
+                display: 'flex',
+                alignItems: 'flex-start'
+              }}
+            >
+              <SvgIcon.info />
+              <div style={{ flexGrow: 1, width: '100%' }}>
+                
+                {/* 💡 [분기 대응] 일반 텍스트 안내 모드인 경우 */}
+                {toast.type === 'info' && (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{toast.text}</div>
+                )}
+
+                {/* 💡 [핵심 패치 지점] /plugins 커맨드가 불렸을 때 표출될 CSS 렌더링 미니 대시보드 폼 구조 */}
+                {toast.type === 'plugins_report' && toast.pluginList && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '6px', marginBottom: '4px', color: 'var(--color-text-main)' }}>
+                      MCP Ecosystem Registry ({toast.pluginList.length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+                      {toast.pluginList.map((p: any, idx: number) => {
+                        const isEnabled = p.enabled !== false;
+                        return (
+                          <div key={p.id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(128,128,128,0.03)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.08)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                              
+                              {/* 🟢⚪ [PluginsView 테마 동기화] 이모지 제거 및 가변 인라인 라이트 닷 기공 */}
+                              <span style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: isEnabled ? '#10b981' : 'rgba(128,128,128,0.4)',
+                                flexShrink: 0,
+                                boxShadow: isEnabled ? '0 0 5px #10b981' : 'none',
+                                transition: 'all 0.2s'
+                              }} />
+                              
+                              <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem', color: isEnabled ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+                                {p.name}
+                              </span>
+                            </div>
+                            
+                            {/* 뱃지 우측 정렬 구조 서브 배치 */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, fontSize: '0.68rem', fontFamily: 'monospace', fontWeight: 800 }}>
+                              <span style={{ padding: '1px 5px', borderRadius: '4px', background: p.type === 'remote' ? 'rgba(59,130,246,0.12)' : 'rgba(245,158,11,0.12)', color: p.type === 'remote' ? '#3b82f6' : '#f59e0b', textTransform: 'uppercase' }}>
+                                {p.type}
+                              </span>
+                              <span style={{ color: 'var(--color-text-muted)' }}>
+                                v{p.version || '1.0.0'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* 요약 진행 배너 */}
-      {isSummarizing && (
-        <div style={{ padding: '10px 20px', textAlign: 'center', background: 'rgba(128, 128, 128, 0.08)', borderBottom: '1px solid rgba(128,128,128,0.15)', fontSize: '0.8rem', color: 'var(--color-text-main)', fontWeight: 600 }}>
-          ✦ 대화 내용을 요약하는 중입니다...
-        </div>
-      )}
+      <AnimatePresence>
+        {isSummarizing && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            style={{ padding: '10px 20px', textAlign: 'center', background: 'rgba(128, 128, 128, 0.08)', borderBottom: '1px solid rgba(128,128,128,0.15)', fontSize: '0.8rem', color: 'var(--color-text-main)', fontWeight: 600, overflow: 'hidden' }}
+          >
+            ✦ 대화 내용을 요약하는 중입니다...
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 메시지 목록 피드 */}
-      <div style={{ flexGrow: 1, width: '100%', padding: '30px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
+      <div 
+        ref={feedRef}
+        style={{ flexGrow: 1, width: '100%', padding: '30px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+      >
         {isLoadingHistory ? (
           <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: '40px', fontWeight: 500 }}>대화 기록 불러오는 중...</div>
         ) : (
-          <div style={{ width: '100%', maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {messages.map((msg) => {
-              const isUser = msg.sender === 'user';
-              
-              if (msg.sender === 'system') return (
-                <div key={msg.id} style={{ alignSelf: 'center', fontSize: '0.85rem', color: 'var(--color-text-main)', fontWeight: 600, padding: '10px 16px', borderRadius: '12px', border: 'var(--border-glass)', background: 'rgba(128,128,128,0.06)', whiteSpace: 'pre-wrap', maxWidth: '90%', lineHeight: 1.6 }}>
-                  {msg.text}
-                </div>
-              );
-              
-              return (
-                <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
-                  {!isUser && (
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)', padding: '0 4px', marginBottom: '2px', letterSpacing: '0.02em' }}>
-                      {activeEngine?.name}
-                    </span>
-                  )}
-                  
-                  <div style={{ 
-                    padding: '13px 18px', 
-                    borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px', 
-                    // 💡 유저 말풍선 명도 조절 및 가변 테마 할당
-                    backgroundColor: isUser ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : 'var(--bg-glass-card)', 
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    border: 'var(--border-glass)', 
-                    color: 'var(--color-text-main)', 
-                    fontWeight: 500, 
-                    maxWidth: '85%', 
-                    lineHeight: 1.6, 
-                    fontSize: '0.95rem', 
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
-                  }}>
-                    {isUser ? (
-                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.text}</div>
-                    ) : (
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          code({ node, inline, className, children, ...props }: any) {
-                            const match = /language-(\w+)/.exec(className || '');
-                            return !inline && match ? (
-                              <div style={{ borderRadius: '8px', overflow: 'hidden', margin: '12px 0', fontSize: '0.88rem', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                                <SyntaxHighlighter
-                                  // 💡 현재 렌더러단 모드 스코프에 맞춰 코드창 테마를 동적으로 스위칭합니다.
-                                  style={(isDark ? vscDarkPlus : prism) as any}
-                                  language={match[1]}
-                                  PreTag="div"
-                                  {...props}
-                                >
-                                  {String(children).replace(/\n$/, '')}
-                                </SyntaxHighlighter>
-                              </div>
-                            ) : (
-                              <code style={{ background: 'rgba(128,128,128,0.1)', padding: '2px 5px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em', fontWeight: 600, color: 'var(--color-text-main)' }} {...props}>
-                                {children}
-                              </code>
-                            );
-                          },
-                          a: ({ href, children }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontWeight: 700, textDecoration: 'underline' }}>{children}</a>
-                          ),
-                          ul: ({ children }) => <ul style={{ paddingLeft: '20px', margin: '6px 0' }}>{children}</ul>,
-                          ol: ({ children }) => <ol style={{ paddingLeft: '20px', margin: '6px 0' }}>{children}</ol>,
-                          li: ({ children }) => <li style={{ marginBottom: '4px' }}>{children}</li>,
-                          p: ({ children }) => <p style={{ margin: '4px 0 8px 0', wordBreak: 'break-word' }}>{children}</p>
-                        }}
-                      >
-                        {msg.text}
-                      </ReactMarkdown>
+          <div style={{ width: '100%', maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <AnimatePresence initial={false}>
+              {messages.map((msg) => {
+                const isUser = msg.sender === 'user';
+                
+                return (
+                  <motion.div 
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 20, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', alignItems: isUser ? 'flex-end' : 'flex-start' }}
+                  >
+                    {!isUser && (
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)', padding: '0 4px', marginBottom: '2px', letterSpacing: '0.02em' }}>
+                        {activeEngine?.name}
+                      </span>
                     )}
-                  </div>
-                </div>
-              );
-            })}
+                    
+                    <div style={{ 
+                      padding: '13px 18px', 
+                      borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px', 
+                      backgroundColor: isUser ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : 'var(--bg-glass-card)', 
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: 'var(--border-glass)', 
+                      color: 'var(--color-text-main)', 
+                      fontWeight: 500, 
+                      maxWidth: '85%', 
+                      lineHeight: 1.6, 
+                      fontSize: '0.95rem', 
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+                    }}>
+                      {isUser ? (
+                        <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.text}</div>
+                      ) : (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code({ node, inline, className, children, ...props }: any) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              return !inline && match ? (
+                                <div style={{ borderRadius: '8px', overflow: 'hidden', margin: '12px 0', fontSize: '0.88rem', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                                  <SyntaxHighlighter
+                                    style={(isDark ? vscDarkPlus : prism) as any}
+                                    language={match[1]}
+                                    PreTag="div"
+                                    {...props}
+                                  >
+                                    {String(children).replace(/\n$/, '')}
+                                  </SyntaxHighlighter>
+                                </div>
+                              ) : (
+                                <code style={{ background: 'rgba(128,128,128,0.1)', padding: '2px 5px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em', fontWeight: 600, color: 'var(--color-text-main)' }} {...props}>
+                                  {children}
+                                </code>
+                              );
+                            },
+                            a: ({ href, children }) => (
+                              <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontWeight: 700, textDecoration: 'underline' }}>{children}</a>
+                            ),
+                            ul: ({ children }) => <ul style={{ paddingLeft: '20px', margin: '6px 0' }}>{children}</ul>,
+                            ol: ({ children }) => <ol style={{ paddingLeft: '20px', margin: '6px 0' }}>{children}</ol>,
+                            li: ({ children }) => <li style={{ marginBottom: '4px' }}>{children}</li>,
+                            p: ({ children }) => <p style={{ margin: '4px 0 8px 0', wordBreak: 'break-word' }}>{children}</p>
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
             
-            {loading && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)', padding: '0 4px' }}>{activeEngine?.name}</span>
-                <div style={{ padding: '12px 20px', borderRadius: '16px', backgroundColor: 'var(--bg-glass-card)', border: 'var(--border-glass)' }}>
-                  <span style={{ display: 'inline-flex', gap: '5px', alignItems: 'center' }}>
-                    {[0, 1, 2].map(i => (
-                      <span key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-text-main)', display: 'inline-block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-                    ))}
-                  </span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+            <AnimatePresence>
+              {loading && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 15, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}
+                >
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-text-muted)', padding: '0 4px' }}>{activeEngine?.name}</span>
+                  <div style={{ padding: '14px 22px', borderRadius: '16px', backgroundColor: 'var(--bg-glass-card)', border: 'var(--border-glass)', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', height: '10px' }}>
+                      {[0, 1, 2].map(i => (
+                        <motion.span 
+                          key={i} 
+                          animate={{ y: [0, -7, 0] }}
+                          transition={{
+                            duration: 1.1,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: i * 0.16
+                          }}
+                          style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-text-main)', display: 'inline-block' }} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div ref={messagesEndRef} style={{ height: '2px' }} />
           </div>
         )}
       </div>
@@ -510,47 +683,56 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
         <div style={{ width: '100%', maxWidth: '720px', position: 'relative' }}>
 
           {/* 슬래시 커맨드 팝업 메뉴 */}
-          {showSlashMenu && filteredCommands.length > 0 && (
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{
-                position: 'absolute', bottom: 'calc(100% + 10px)', left: 0, right: 0,
-                background: 'var(--bg-bubble-bot)', 
-                border: 'var(--border-glass)', 
-                borderRadius: '16px', overflow: 'hidden',
-                backdropFilter: 'blur(30px)',
-                WebkitBackdropFilter: 'blur(30px)',
-                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.15)',
-                zIndex: 100,
-              }}
-            >
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(128,128,128,0.1)', fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 700, letterSpacing: '0.04em', backgroundColor: 'rgba(128,128,128,0.03)' }}>
-                커맨드 — ↑↓ 이동 · Enter 실행 · Tab 자동완성 · Esc 닫기
-              </div>
-              {filteredCommands.map((cmd, idx) => (
-                <div
-                  key={cmd.command}
-                  onClick={() => executeSlashCommand(cmd.command)}
-                  onMouseEnter={() => setSelectedIndex(idx)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '12px 16px', cursor: 'pointer',
-                    backgroundColor: idx === selectedIndex ? 'rgba(128,128,128,0.06)' : 'transparent',
-                    borderLeft: idx === selectedIndex ? '4px solid var(--color-text-main)' : '4px solid transparent',
-                    transition: 'all 0.1s ease',
-                  }}
-                >
-                  <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{cmd.icon}</span>
-                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-text-main)', fontFamily: 'monospace' }}>
-                    {cmd.command}
-                  </span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
-                    {cmd.description}
-                  </span>
+          <AnimatePresence>
+            {showSlashMenu && filteredCommands.length > 0 && (
+              <motion.div
+                onClick={e => e.stopPropagation()}
+                initial={{ opacity: 0, scale: 0.96, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 10 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                style={{
+                  position: 'absolute', bottom: 'calc(100% + 10px)', left: 0, right: 0,
+                  background: 'var(--bg-bubble-bot)', 
+                  border: 'var(--border-glass)', 
+                  borderRadius: '16px', overflow: 'hidden',
+                  backdropFilter: 'blur(30px)',
+                  WebkitBackdropFilter: 'blur(30px)',
+                  boxShadow: '0 12px 32px rgba(0, 0, 0, 0.15)',
+                  zIndex: 100,
+                  originY: 1
+                }}
+              >
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(128,128,128,0.1)', fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 700, letterSpacing: '0.04em', backgroundColor: 'rgba(128,128,128,0.03)' }}>
+                  커맨드 — ↑↓ 이동 · Enter 실행 · Tab 자동완성 · Esc 닫기
                 </div>
-              ))}
-            </div>
-          )}
+                {filteredCommands.map((cmd, idx) => (
+                  <motion.div
+                    key={cmd.command}
+                    onClick={() => executeSlashCommand(cmd.command)}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '12px 16px', cursor: 'pointer',
+                      backgroundColor: idx === selectedIndex ? 'rgba(128,128,128,0.06)' : 'transparent',
+                      borderLeft: idx === selectedIndex ? '4px solid var(--color-text-main)' : '4px solid transparent',
+                      transition: 'background-color 0.12s ease, border-left 0.12s ease',
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', color: idx === selectedIndex ? 'var(--color-text-main)' : 'var(--color-text-muted)', flexShrink: 0 }}>
+                      <DynamicIcon type={cmd.iconType} />
+                    </span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-text-main)', fontFamily: 'monospace' }}>
+                      {cmd.command}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
+                      {cmd.description}
+                    </span>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* 메인 인풋 박스 */}
           <div style={{ 
@@ -578,8 +760,11 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
             <select value={activeEngine?.id ?? ''} onChange={(e) => onProviderChange(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-main)', fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', outline: 'none', paddingRight: '4px' }}>
               {engines.map(eng => <option key={eng.id} value={eng.id} style={{ background: 'var(--bg-input)', color: 'var(--color-text-main)' }}>{eng.name}</option>)}
             </select>
-            <button
-              onClick={handleSend} disabled={loading || !input.trim()}
+            <motion.button
+              onClick={handleSend} 
+              disabled={loading || !input.trim()}
+              whileHover={{ scale: (loading || !input.trim()) ? 1 : 1.06 }}
+              whileTap={{ scale: (loading || !input.trim()) ? 1 : 0.95 }}
               style={{ 
                 width: '36px', 
                 height: '36px', 
@@ -593,9 +778,9 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
-                transition: 'all 0.15s ease',
+                transition: 'background-color 0.15s ease, color 0.15s ease',
               }}
-            >↑</button>
+            >↑</motion.button>
           </div>
         </div>
       </div>
