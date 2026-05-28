@@ -1,5 +1,5 @@
 // src/main/main.ts
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron';
 import * as path from 'path';
 import axios from 'axios';
 import * as fs from 'fs';
@@ -49,7 +49,7 @@ function createWindow() {
   else mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 }
 
-// 💡 [전략 2] 외부 플러그인 전용 독립 의존성 환경 선제 구축
+// 외부 플러그인 전용 독립 의존성 환경 선제 구축
 async function prepareExternalPluginsEnv() {
   const pluginsDir = path.join(app.getPath('userData'), 'external_plugins');
   const pkgPath = path.join(pluginsDir, 'package.json');
@@ -100,11 +100,11 @@ async function startHealthCheckScheduler() {
           try {
             await axios.get(`${p.url}/api/v1/tools`, {
               headers: { 'X-API-KEY': p.apiKey || '' },
-              timeout: 2000 // 핑 스캔이므로 타이트하게 2초 타임아웃 제한
+              timeout: 2000 
             });
-            globalOnlineStates[p.id] = true; // 🟢 가동 확인
+            globalOnlineStates[p.id] = true; 
           } catch {
-            globalOnlineStates[p.id] = false; // 🔴 유실 확정
+            globalOnlineStates[p.id] = false; 
           }
         })
       );
@@ -114,7 +114,6 @@ async function startHealthCheckScheduler() {
     }
   };
 
-  // 초기 로드 시점에 즉각 1회 검증 이후 1분마다 인터벌 순환
   await checkAllRemotes();
   setInterval(checkAllRemotes, 60000);
 }
@@ -126,16 +125,12 @@ function registerIpcHandlers() {
   ipcMain.handle('remove-mcp-plugin', async (_, pluginId: string) => {
     try { 
       await pluginManager.removePlugin(pluginId); 
-      // 캐시 맵에서도 찌꺼기가 남지 않게 제거
       if (globalOnlineStates[pluginId] !== undefined) delete globalOnlineStates[pluginId];
       return { success: true }; 
     }
     catch (error: any) { return { success: false, error: error.message }; }
   });
 
-  // =========================================================================
-  // 💡 [통합] 단일 창구로 진화한 플러그인 등록 가동 핸들러 (버전 수급 기능 이식)
-  // =========================================================================
   ipcMain.handle('mcp:add-plugin', async (_event, config) => {
     try {
       const pluginsDir = path.join(app.getPath('userData'), 'external_plugins');
@@ -155,13 +150,11 @@ function registerIpcHandlers() {
           targetFilePath = destinationPath;
         } 
         else if (fs.existsSync(targetFilePath) && !targetFilePath.includes('external_plugins')) {
-          // 💡 이미 격리 폴더에 들어있는 파일이 아닐 때만 격리 복사 수행 (수정 시 오동작 방지)
           await fsPromises.copyFile(targetFilePath, destinationPath);
           targetFilePath = destinationPath;
         }
       }
 
-      // 💡 [수정] 모달에서 넘겨준 수정본 workspaceDir이 있다면 우선 적용, 없다면 기존 pluginsDir 폴백
       const resolvedWorkspaceDir = config.type === 'custom'
         ? (config.workspaceDir?.trim() || pluginsDir)
         : undefined;
@@ -174,14 +167,10 @@ function registerIpcHandlers() {
 
       const tools = await pluginManager.registerNewPlugin(finalConfig);
 
-      // =========================================================================
-      // 🎯 [핀포인트 핫 리로드] 수정 저장이 일어난 직후, 
-      //     해당 플러그인 인스턴스 하나만 즉시 프로세스를 내렸다가 새 경로로 재부팅시킵니다!
-      // =========================================================================
       if (pluginManager && config.enabled !== false) {
         console.log(`🔄 [Main Sync] 설정 변경 감지로 인한 단일 핫 리로드 가동: ${config.name}`);
-        await pluginManager.toggleSinglePlugin(config.id, false); // 메모리에서 내리고 프로세스 Kill
-        await pluginManager.toggleSinglePlugin(config.id, true);  // 새 설정(Workspace)으로 프로세스 부팅
+        await pluginManager.toggleSinglePlugin(config.id, false); 
+        await pluginManager.toggleSinglePlugin(config.id, true);  
       }
       
       const loadedPlugin = (pluginManager as any).plugins.get(config.id);
@@ -220,7 +209,6 @@ function registerIpcHandlers() {
     catch (e: any) { return { success: false, error: e.message }; }
   });
 
-  // 연쇄적 도구 호출(Multi-Tool Calling) 지원 무한 루프 프록시 엔진
   ipcMain.handle('llm:chat-proxy', async (_, { engine, messages, apiKey }) => {
     try {
       let currentMessages = [...messages];
@@ -241,18 +229,61 @@ function registerIpcHandlers() {
 
         const lastMessage = currentMessages[currentMessages.length - 1];
         let textPrompt = '';
+        
         if (lastMessage && lastMessage.content) {
-          textPrompt = Array.isArray(lastMessage.content)
-            ? lastMessage.content.map((c: any) => c.text || '').join(' ')
-            : String(lastMessage.content);
+          if (Array.isArray(lastMessage.content)) {
+            textPrompt = lastMessage.content
+              .filter((c: any) => c.type === 'text')
+              .map((c: any) => c.text || '')
+              .join(' ');
+          } else {
+            textPrompt = String(lastMessage.content);
+          }
         }
+
         const dynamicTools = await pluginManager.getAllToolsForLlm(textPrompt);
 
         if (engine.provider === 'openai') {
-          body.messages = currentMessages;
+          body.messages = currentMessages.map((m: any) => {
+            if (Array.isArray(m.content)) {
+              return {
+                role: m.role,
+                content: m.content.filter((c: any) => c.type === 'text' || c.type === 'image_url')
+              };
+            }
+            return m;
+          });
           if (dynamicTools && dynamicTools.length > 0) body.tools = dynamicTools;
+          
         } else if (engine.provider === 'anthropic') {
-          body.messages = currentMessages;
+          body.messages = currentMessages.map((m: any) => {
+            if (Array.isArray(m.content)) {
+              const processedContent: any[] = [];
+              
+              m.content.forEach((c: any) => {
+                if (c.type === 'text') {
+                  processedContent.push(c);
+                } else if (c.type === 'image_url' && c.image_url?.url?.includes('base64,')) {
+                  const [meta, base64Data] = c.image_url.url.split('base64,');
+                  const mediaType = meta.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
+                  processedContent.push({
+                    type: 'image',
+                    source: { type: 'base64', media_type: mediaType, data: base64Data }
+                  });
+                } else if (c.type === 'pdf_file' && c.base64Data) {
+                  const rawBase64 = c.base64Data.includes('base64,') ? c.base64Data.split('base64,')[1] : c.base64Data;
+                  processedContent.push({
+                    type: 'document',
+                    source: { type: 'base64', media_type: 'application/pdf', data: rawBase64 }
+                  });
+                }
+              });
+              
+              return { role: m.role, content: processedContent };
+            }
+            return m;
+          });
+          
           body.max_tokens = 2048;
           if (dynamicTools && dynamicTools.length > 0) {
             body.tools = dynamicTools.map((t: any) => ({
@@ -261,11 +292,28 @@ function registerIpcHandlers() {
               input_schema: t.input_schema
             }));
           }
+          
         } else if (engine.provider === 'google') {
-          body.contents = currentMessages.map((m: any) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: Array.isArray(m.content) ? m.content : [{ text: String(m.content) }],
-          }));
+          body.contents = currentMessages.map((m: any) => {
+            let parts: any[] = [];
+            if (Array.isArray(m.content)) {
+              m.content.forEach((c: any) => {
+                if (c.type === 'text') {
+                  parts.push({ text: c.text || '' });
+                } else if (c.type === 'image_url' && c.image_url?.url?.includes('base64,')) {
+                  const [meta, base64Data] = c.image_url.url.split('base64,');
+                  const mimeType = meta.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
+                  parts.push({ inlineData: { mimeType, data: base64Data } });
+                } else if (c.type === 'pdf_file' && c.base64Data) {
+                  const rawBase64 = c.base64Data.includes('base64,') ? c.base64Data.split('base64,')[1] : c.base64Data;
+                  parts.push({ inlineData: { mimeType: 'application/pdf', data: rawBase64 } });
+                }
+              });
+            } else {
+              parts = [{ text: String(m.content) }];
+            }
+            return { role: m.role === 'assistant' ? 'model' : 'user', parts };
+          });
         }
 
         const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -274,11 +322,9 @@ function registerIpcHandlers() {
 
         if (engine.provider === 'openai') {
           const assistantMessage = rawData.choices[0].message;
-
           if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
             return { success: true, data: { text: assistantMessage.content || '', rawMessage: assistantMessage } };
           }
-
           currentMessages.push(assistantMessage);
 
           for (const toolCall of assistantMessage.tool_calls) {
@@ -304,18 +350,10 @@ function registerIpcHandlers() {
           if (!isToolUse) {
             const textBlock = rawData.content?.find((b: any) => b.type === 'text');
             const finalReplyText = textBlock?.text ?? '';
-
-            return {
-              success: true,
-              data: {
-                text: finalReplyText,
-                rawMessage: { role: 'assistant', content: finalReplyText }
-              }
-            };
+            return { success: true, data: { text: finalReplyText, rawMessage: { role: 'assistant', content: finalReplyText } } };
           }
 
           currentMessages.push({ role: 'assistant', content: rawData.content });
-
           const toolRequests = rawData.content.filter((b: any) => b.type === 'tool_use');
           const toolResultsBlocks: any[] = [];
 
@@ -336,7 +374,6 @@ function registerIpcHandlers() {
               content: resultText
             });
           }
-
           currentMessages.push({ role: 'user', content: toolResultsBlocks });
           continue;
         }
@@ -345,11 +382,9 @@ function registerIpcHandlers() {
           const text = rawData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
           return { success: true, data: { text, rawMessage: { role: 'assistant', content: text } } };
         }
-
         break;
       }
-
-      return { success: false, error: '지원하지 않는 provider 구조체 체인 오류' };
+      return { success: false, error: '지원하지 않는 provider 구조체 chain 오류' };
     } catch (error: any) {
       console.error("🚨 Proxy Error:", error);
       return { success: false, error: error.message };
@@ -375,7 +410,40 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('chat:get-messages', async (_, sessionId) => {
-    return await db.all('SELECT * FROM messages WHERE sessionId = ? ORDER BY timestamp ASC', [sessionId]);
+    try {
+      // 1. DB에서 모든 메시지 호출
+      const rows = await db.all('SELECT * FROM messages WHERE sessionId = ? ORDER BY timestamp ASC', [sessionId]);
+      
+      // 2. 메시지 본문 데이터 무결성 검증 및 교정
+      return rows.map((m: any) => {
+        if (m.content && typeof m.content === 'string') {
+          let updatedContent = m.content;
+
+          // [핵심 보정] 
+          // 1. 과거의 [IMG_PATH:file://...] 형식을 [IMG_PATH:media://...]로 변환
+          // 2. 파일명에 포함된 URL 인코딩 문자(공백 등)를 렌더러가 인식할 수 있게 마커 내부를 유지하되
+          //    브라우저 보안 가드에 걸리지 않도록 media:// 프로토콜로 치환
+          const imagesDir = path.join(app.getPath('userData'), 'chat_images').replace(/\\/g, '/');
+          
+          // 정규식에서 파일명 부분에 URL 인코딩 문자(%20 등)가 와도 매칭되도록 [^\]]+ 사용
+          const legacyFileRegex = new RegExp(`\\[IMG_PATH:file:\\/\\/[^\\]]*?${imagesDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\/([^\\]]+)\\]`, 'g');
+          
+          updatedContent = updatedContent.replace(legacyFileRegex, '[IMG_PATH:media://$1]');
+
+          // [가드 로직] 텍스트 파싱을 방해하는 찌꺼기 [IMG_DATA:...] 마커 완전히 제거
+          updatedContent = updatedContent.replace(/\[IMG_DATA:[^\]]+\]/g, '');
+
+          return {
+            ...m,
+            content: updatedContent
+          };
+        }
+        return m;
+      });
+    } catch (error) {
+      console.error('🚨 메시지 히스토리 파싱 수급 실패:', error);
+      return [];
+    }
   });
 
   ipcMain.handle('chat:save-message', async (_, { id, sessionId, role, content }) => {
@@ -390,6 +458,65 @@ function registerIpcHandlers() {
   ipcMain.handle('chat:update-session-title', async (_, { sessionId, title }) => {
     await db.run('UPDATE chat_sessions SET title = ?, updatedAt = ? WHERE id = ?', [title, Date.now(), sessionId]);
     return { success: true };
+  });
+
+  // 실물 이미지를 엑스박스 없이 렌더링하기 위한 로컬 격리 복사 핸들러 (media:// 바인딩)
+  ipcMain.handle('chat:upload-local-image', async (_, { name, base64Data }) => {
+    try {
+      const imagesDir = path.join(app.getPath('userData'), 'chat_images');
+      if (!fs.existsSync(imagesDir)) {
+        await fsPromises.mkdir(imagesDir, { recursive: true });
+      }
+
+      // 💡 [핵심 교정] 공백을 언더바(_)로 완전 치환 (인코딩 문제 제거)
+      const safeName = name.replace(/\s+/g, '_');
+      const filename = `${Date.now()}_${safeName}`;
+      const destinationPath = path.join(imagesDir, filename);
+
+      const rawBase64 = base64Data.includes('base64,') ? base64Data.split('base64,')[1] : base64Data;
+      await fsPromises.writeFile(destinationPath, Buffer.from(rawBase64, 'base64'));
+
+      return { success: true, localPath: `media://${filename}` };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 세션 삭제 시 디스크에 방치되는 첨부 이미지들을 일괄 수거 삭제하는 핸들러 (오류 보정)
+  ipcMain.handle('chat:delete-session-images', async (_, { sessionId }) => {
+    try {
+      // 컴파일 크래시를 방지하기 위해 정규화된 쿼리 파이프라인으로 전처리 복원 완료
+      const messages = await db.all('SELECT * FROM messages WHERE sessionId = ?', [sessionId]).catch(() => []);
+      
+      // media:// 규격에 맞춰 정규식 스캔 보정 완료
+      const imgPathRegex = /\[IMG_PATH:media:\/\/([^\]]+)\]/g;
+      const fileNamesToDelete: string[] = [];
+
+      messages.forEach((m: any) => {
+        if (m.content && typeof m.content === 'string') {
+          let match;
+          while ((match = imgPathRegex.exec(m.content)) !== null) {
+            fileNamesToDelete.push(match[1]);
+          }
+        }
+      });
+
+      const imagesDir = path.join(app.getPath('userData'), 'chat_images');
+      let deletedCount = 0;
+      for (const fileName of fileNamesToDelete) {
+        const fullPath = path.join(imagesDir, fileName);
+        if (fs.existsSync(fullPath)) {
+          await fsPromises.unlink(fullPath);
+          deletedCount++;
+        }
+      }
+
+      console.log(`🧹 [가비지 컬렉터] 세션 ${sessionId}의 방치 미디어 이미지 ${deletedCount}개 소거 완료`);
+      return { success: true, deletedCount };
+    } catch (error: any) {
+      console.error('❌ 세션 이미지 가비지 컬렉션 처리 실패:', error);
+      return { success: false, error: error.message };
+    }
   });
 
   ipcMain.handle('summary:get', async (_, sessionId: string) => {
@@ -423,7 +550,6 @@ function registerIpcHandlers() {
     });
   });
 
-  // 💡 [Health Cache 리팩토링] 프론트엔드 실시간 핑 요쳥 시 스케줄러가 보관한 캐시맵 즉시 조회 토스
   ipcMain.handle('mcp:check-remote-status', async (_, { url, apiKey }) => {
     try {
       const row = await db.get("SELECT id FROM mcp_plugins WHERE url = ?", [url]);
@@ -431,7 +557,6 @@ function registerIpcHandlers() {
         return globalOnlineStates[row.id];
       }
       
-      // 혹시 명세 저장 전인 가상 임시 등록 단계 주소일 경우를 위한 폴백(Fallback) 일회성 동적 조회 유지
       await axios.get(`${url}/api/v1/tools`, { 
         headers: { 'X-API-KEY': apiKey || '' }, 
         timeout: 2000 
@@ -442,23 +567,17 @@ function registerIpcHandlers() {
     }
   });
 
-  // =========================================================================
-  // 🎯 [단일 조준 최적화 리팩토링] 전체 리로드를 방지하고 핀포인트 제어 가동
-  // =========================================================================
   ipcMain.handle('mcp:toggle-plugin', async (_, { pluginId, enabled }) => {
     try {
-      // 1. DB 상태 즉시 업데이트 (1 또는 0)
       await db.run(
         'UPDATE mcp_plugins SET enabled = ? WHERE id = ?',
         [enabled ? 1 : 0, pluginId]
       );
 
-      // 2. ❌ 무거운 loadPlugins() 전체 스캔을 도려내고 단일 모듈만 조준 타격 제어
       if (pluginManager) {
         await pluginManager.toggleSinglePlugin(pluginId, enabled);
       }
 
-      // 3. 만약 원격 플러그인을 끈 거라면 전역 헬스 캐시 맵에서도 즉시 제거하여 청소
       if (!enabled && globalOnlineStates[pluginId] !== undefined) {
         delete globalOnlineStates[pluginId];
       }
@@ -487,16 +606,24 @@ const migrateEngines = async () => {
 };
 
 app.whenReady().then(async () => {
+  protocol.handle('media', (request) => {
+    const fileUrl = request.url.replace('media://', '');
+    const imagesDir = path.join(app.getPath('userData'), 'chat_images');
+    const safePath = path.join(imagesDir, fileUrl); // 직접 결합
+
+    if (safePath.startsWith(imagesDir) && fs.existsSync(safePath)) {
+      return net.fetch(`file://${safePath}`);
+    }
+    return new Response('Not Found', { status: 404 });
+  });
+
   db = await initDb();
   await migrateEngines();
-  
-  // 💡 플러그인을 활성화하여 로드하기 전에 샌드박스 폴더 환경을 먼저 준비합니다.
   await prepareExternalPluginsEnv();
   
   pluginManager = new McpPluginManager(db);
   await pluginManager.loadPlugins();
 
-  // 모든 리모트 인프라 인스턴스 정보가 보관 완료된 직후 60초 백그라운드 스케줄러 가동
   await startHealthCheckScheduler();
 
   registerIpcHandlers();

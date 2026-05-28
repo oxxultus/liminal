@@ -175,10 +175,25 @@ export default function App() {
     setCurrentView('chat');
   };
 
+  // src/renderer/App.tsx 내부 `handleDeleteSession` 핸들러 영역 대보수
+
   const handleDeleteSession = async (sessionId: string) => {
+    // =========================================================================
+    // 💡 [디스크 누수 차단 패치]
+    //    세션 데이터가 완전히 파괴되어 날아가기 전에, 프리로드 브릿지를 노크하여
+    //    대화 본문에 임베딩되어 보존되던 실물 복사 이미지들을 디스크에서 먼저 영구 파쇄합니다.
+    // =========================================================================
+    if (window.electronAPI.deleteSessionImages) {
+      await window.electronAPI.deleteSessionImages({ sessionId }).catch((e) => {
+        console.error("세션 이미지 소거 실패 파이프 오류 폴백:", e);
+      });
+    }
+
+    // 기존의 영속 데이터베이스 및 로컬 상태창 동기화 소거 흐름 유지
     await window.electronAPI.deleteSession(sessionId);
     const remaining = sessions.filter(s => s.id !== sessionId);
     setSessions(remaining);
+    
     if (activeSessionId === sessionId) {
       setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
     }

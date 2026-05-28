@@ -33,14 +33,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateChatSessionTitle: (args: { sessionId: string; title: string }) => ipcRenderer.invoke('chat:update-session-title', args),
   getSummary: (sessionId: string) => ipcRenderer.invoke('summary:get', sessionId),
   saveSummary: (args: any) => ipcRenderer.invoke('summary:save', args),
+  uploadLocalImage: (payload: { name: string; base64Data: string }) => ipcRenderer.invoke('chat:upload-local-image', payload),
+  deleteSessionImages: (payload: { sessionId: string }) => ipcRenderer.invoke('chat:delete-session-images', payload),
 
   openFileDialog: () => ipcRenderer.invoke('mcp:open-file-dialog'),
   uploadPlugin: (payload: any) => ipcRenderer.invoke('mcp:upload-plugin', payload),
 
-  // =========================================================================
-  // 💡 [신규 추가] 원격 서버 플러그인의 실시간 활성화 상태 체크 (Online/Offline 스캔용)
-  // =========================================================================
+
+  // 원격 서버 플러그인의 실시간 활성화 상태 체크 (Online/Offline 스캔용)
   checkRemoteStatus: (payload: { url: string; apiKey: string }) => ipcRenderer.invoke('mcp:check-remote-status', payload),
-  // src/main/preload.ts 내부에 추가
+
+
   toggleMcpPlugin: (payload: { pluginId: string; enabled: boolean }) => ipcRenderer.invoke('mcp:toggle-plugin', payload),
 });

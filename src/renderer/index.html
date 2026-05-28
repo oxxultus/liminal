@@ -3,11 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:5173 ws://localhost:5173; style-src 'self' 'unsafe-inline';" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      connect-src 'self' http://localhost:5173 ws://localhost:5173 https:;
+      style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+      font-src 'self' https://cdn.jsdelivr.net;
+      img-src 'self' data: media: blob:;
+    " />
 
     <title>MCP Universal LLM Client</title>
     <style>
-      /* 우측 흰색 유령 스크롤바 바디 영역 완전 소멸 */
       ::-webkit-scrollbar {
         display: none !important;
         width: 0px !important;
@@ -19,8 +25,6 @@
         width: 100% !important;
         height: 100% !important;
         overflow: hidden !important;
-        
-        /* 🤍 쨍하지 않은 소프트 화이트/실버 라이트 모드 배경 */
         background: linear-gradient(135deg, #F9F9FB 0%, #F4F4F6 50%, #EAEAEF) !important;
       }
     </style>
