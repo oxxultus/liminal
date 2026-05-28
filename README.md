@@ -1,4 +1,4 @@
-> ⚠️ 본 시스템의 플러그인 규격은 공식 MCP 표준과 호환되지 않는 독자 구현입니다.
+> 본 시스템의 플러그인 규격은 공식 MCP 표준과 호환되지 않는 독자 구현입니다.
 # Liminal Desktop
 
 > 다중 LLM 엔진과 MCP 플러그인을 하나의 워크스페이스에서 운용하는 AI 데스크탑 클라이언트
@@ -71,7 +71,7 @@ Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단�
 |---|---|
 | Node.js | 22.x 이상 |
 | Electron | 28.x 이상 |
-| npm | 9.x 이상 |
+| npm | 11.x 이상 |
 
 <br>
 
@@ -79,7 +79,7 @@ Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단�
 
 ```bash
 # 저장소 클론
-git clone [https://github.com/yourname/liminal-desktop.git](https://github.com/yourname/liminal-desktop.git)
+git clone [https://github.com/oxxultus/liminal-desktop.git](https://github.com/oxxultus/liminal-desktop.git)
 cd liminal-desktop
 
 # 의존성 설치
@@ -89,7 +89,7 @@ npm install
 npm run dev
 
 # 프로덕션 빌드
-npm run build
+npm run build #package
 
 ```
 
@@ -149,7 +149,7 @@ const workspaceDir = process.env.WORKSPACE_DIR ? path.resolve(process.env.WORKSP
 // 메인 앱의 동적 문맥 필터링 스위치로 사용될 고유 키워드 리스트
 const keywords = ['파일', '메모', '저장', 'file', 'memo', 'save', 'txt'];
 
-// Safe Path Helper: 샌드박스(Directory Traversal) 방어
+// Safe Path Helper: 샌드박스(Directory Traversal) 방어 <- 미사용시 작성안해도 됩니다.
 const resolveSafePath = (filename) => {
   if (!workspaceDir) {
     throw new Error('이 도구를 실행하려면 플러그인 설정에서 Workspace 경로를 연동해야 합니다.');
@@ -184,7 +184,7 @@ server.tool(
       };
     } catch (error) {
       return {
-        content: [{ type: 'text', text: `❌ 실행 실패: ${error.message}` }]
+        content: [{ type: 'text', text: `실행 실패: ${error.message}` }]
       };
     }
   }
@@ -238,9 +238,11 @@ Keywords 미선언       →  상시 활성화 상태로 대기 (모든 대화 �
 
 ```
 
-#### 2. 파괴적 명령 관문 제어 (Confirm 인터셉터)
+#### 2. 파일 수정 삭제 명령 제어 (Confirm 인터셉터)
 
 도구 이름이 `write_text_file` 또는 `delete_file`로 끝나는 명령 판정이 감지되면, 실행 직전 Electron 메인 컨텍스트 수준에서 네이티브 컨펌 알림창(`dialog.showMessageBox`)을 트리거합니다. 최종 사용자가 물리적으로 승인(Execute)을 확정해야만 서브 프로세스로 데이터 파이프가 연결되는 안전장치가 작동합니다.
+
+- 도구 추가시 네이밍에 위 키워드를 넣으면 팝업모달이 뜹니다.
 
 #### 3. 유연한 작업 공간(Workspace) 정책
 
@@ -291,4 +293,4 @@ Keywords 미선언       →  상시 활성화 상태로 대기 (모든 대화 �
 
 ## 라이선스
 
-MIT License © 2025 oxxultus
+MIT License © 2026 oxxultus
