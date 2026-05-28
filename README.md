@@ -40,6 +40,10 @@ Liminal Desktop은 OpenAI, Anthropic, Google 등 다양한 LLM 공급자를 단�
 |:-:|:-:|:-:|
 | ![Chat](./docs/assets/screenshot-chat.png) | ![Settings](./docs/assets/screenshot-settings.png) | ![Plugins](./docs/assets/screenshot-plugins.png) |
 
+| 자동화설정 | 자동화추가 | 자동화수정 |
+|:-:|:-:|:-:|
+| ![Automation](./docs/assets/screenshot-automation.png) | ![Automation](./docs/assets/screenshot-automation-add.png) | ![Automation](./docs/assets/screenshot-automation-edit.png) |
+
 | 라이트 모드 | 다크 모드 |
 |:-:|:-:|
 | ![Light](./docs/assets/screenshot-light.png) | ![Dark](./docs/assets/screenshot-dark.png) |
