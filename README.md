@@ -136,9 +136,10 @@ import path from 'path';
 import fs from 'fs/promises';
 
 // ====================== 1. 서버 초기화 ======================
+const pluginVersion = '1.0.0'; // 해당 버전이 로드시 버전으로 등록됩니다.
 const server = new McpServer({
   name: 'advanced-file-plugin',
-  version: '1.0.0'
+  version: pluginVersion
 });
 
 // 시스템(StdioMcpPlugin)이 선택적으로 주입한 환경변수 바인딩
@@ -202,8 +203,9 @@ process.stdout.write = (chunk, encoding, callback) => {
         const packet = JSON.parse(line);
         // 메인 프로세스가 tools/list 조회를 요청한 정상 응답 패킷 구조인 경우
         if (packet.result && packet.result.tools && !packet.error) {
-          // 💡 응답 객체에 상단에서 정의한 고유 키워드 배열을 동적으로 탑재하여 가로챔
+          // 키워드 정보와 버전 정보
           packet.result.keywords = keywords;
+          packet.result.version = pluginVersion;
         }
         return JSON.stringify(packet);
       } catch (e) {

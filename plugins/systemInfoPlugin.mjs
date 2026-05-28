@@ -4,9 +4,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import os from 'os';
 
 // ====================== 서버 초기화 ======================
+const pluginVersion = '1.0.3'; // 해당 버전이 로드시 버전으로 등록됩니다.
 const server = new McpServer({
   name: 'system-info',
-  version: '1.0.0'
+  version: pluginVersion
 });
 
 // ====================== 키워드 (동적 필터링용) ======================
@@ -67,6 +68,7 @@ process.stdout.write = (chunk, encoding, callback) => {
         if (packet.result && packet.result.tools && !packet.error) {
           // 공식 SDK 결과 객체 내부에 동적 필터링용 고유 키워드 주입
           packet.result.keywords = keywords;
+          packet.result.version = pluginVersion;
         }
         return JSON.stringify(packet);
       } catch (e) {
