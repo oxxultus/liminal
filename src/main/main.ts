@@ -8,12 +8,14 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { McpPluginManager } from './mcp/pluginManager';
 import { initDb } from './db';
+import { McpSequenceEngine } from './mcp/sequenceEngine';
 
 const execAsync = promisify(exec);
 
 let mainWindow: BrowserWindow | null = null;
 let db: any;
 let pluginManager: McpPluginManager;
+let sequenceEngine: McpSequenceEngine;
 
 // =========================================================================
 // 💡 [Health Cache] 전역에서 관리할 리모트 플러그인 생사 상태 메모리 풀
@@ -44,6 +46,8 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+
+  if (sequenceEngine) { sequenceEngine.setMainWindow(mainWindow);}
 
   if (isDev) mainWindow.loadURL('http://localhost:5173');
   else mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
@@ -100,7 +104,7 @@ async function startHealthCheckScheduler() {
           try {
             await axios.get(`${p.url}/api/v1/tools`, {
               headers: { 'X-API-KEY': p.apiKey || '' },
-              timeout: 2000 
+              timeout: 1000 
             });
             globalOnlineStates[p.id] = true; 
           } catch {
@@ -516,6 +520,177 @@ function registerIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // 자동화 시퀀스
+  ipcMain.handle('mcp:get-automation-sequences', async () => {
+    try {
+      // 💡 [핵심 수정] JOIN을 사용하여 마스터 정보와 스케줄(cron, lastRun) 정보를 한 번에 긁어옵니다.
+      const sequences = await db.all(`
+        SELECT 
+          q.*, 
+          s.cronExpression, 
+          s.lastRunTimestamp 
+        FROM automation_sequences q
+        LEFT JOIN automation_schedules s ON q.id = s.sequenceId
+        ORDER BY q.createdAt DESC
+      `);
+      
+      for (const seq of sequences) {
+        const steps = await db.all(
+          'SELECT * FROM sequence_steps WHERE sequenceId = ? ORDER BY stepOrder ASC',
+          [seq.id]
+        );
+        seq.steps = steps.map((step: any) => ({
+          id: step.id,
+          fullToolName: step.fullToolName,
+          argsTemplate: step.argsTemplate,
+          pluginId: step.pluginId
+        }));
+      }
+      
+      return sequences;
+    } catch (e) {
+      console.error("데이터 로드 실패:", e);
+      return [];
+    }
+  });
+
+  // 2. 특정 자동화 명세 완전 삭제 파쇄
+  ipcMain.handle('mcp:delete-automation-sequence', async (_, sequenceId) => {
+    await db.run('DELETE FROM automation_sequences WHERE id = ?', [sequenceId]);
+    return { success: true };
+  });
+
+  // 3. 수동 즉시 단추 요청 접수 -> 이전에 만들어둔 sequenceEngine 트리거 호출
+  ipcMain.handle('mcp:trigger-sequence-now', async (_, sequenceId) => {
+    try {
+      // 이미 메인 레벨에 가동 결합해 둔 시퀀스 엔진을 그대로 흔들어 깨웁니다.
+      await sequenceEngine.executeSequence(sequenceId);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  // src/main/main.ts 내부의 saveAutomationSequence 핸들러 교체
+  ipcMain.handle('mcp:save-automation-sequence', async (event, payload) => {
+    const { id, name, description, cronExpression, isEnabled, steps } = payload;
+    
+    // 활성화 여부 기본값 가드 (전달 안 되면 활성화(1)가 기본)
+    const enabledFlag = isEnabled === false ? 0 : 1;
+
+    try {
+      // 1. 트랜잭션 개시
+      await db.run('BEGIN TRANSACTION');
+
+      // 2. 기존 시퀀스가 있는지 검사
+      const existing = await db.get('SELECT id FROM automation_sequences WHERE id = ?', [id]);
+
+      if (existing) {
+        // 💡 [수정] 이 장소에서 isEnabled 상태도 완벽하게 데이터베이스에 갱신 처리합니다.
+        await db.run(
+          `UPDATE automation_sequences 
+          SET name = ?, description = ?, isEnabled = ?, updatedAt = ? 
+          WHERE id = ?`,
+          [name, description, enabledFlag, Date.now(), id]
+        );
+      } else {
+        // 💡 [수정] 신규 생성 시에도 isEnabled 상태를 함께 인서트합니다.
+        await db.run(
+          `INSERT INTO automation_sequences (id, name, description, isEnabled, createdAt, updatedAt) 
+          VALUES (?, ?, ?, ?, ?, ?)`,
+          [id, name, description, enabledFlag, Date.now(), Date.now()]
+        );
+      }
+
+      // 3. 스케줄러 정보 동기화 (cronExpression 및 isEnabled 플래그 연동 업데이트)
+      const existingSched = await db.get('SELECT id FROM automation_schedules WHERE sequenceId = ?', [id]);
+      if (existingSched) {
+        await db.run(
+          `UPDATE automation_schedules 
+          SET cronExpression = ?, isEnabled = ? 
+          WHERE sequenceId = ?`,
+          [cronExpression, enabledFlag, id]
+        );
+      } else {
+        await db.run(
+          `INSERT INTO automation_schedules (id, sequenceId, cronExpression, isEnabled, lastRunTimestamp) 
+          VALUES (?, ?, ?, ?, NULL)`,
+          [`sched-${Date.now()}`, id, cronExpression, enabledFlag]
+        );
+      }
+
+      // 4. 하위 스텝들 초기화 후 재정비
+      await db.run('DELETE FROM sequence_steps WHERE sequenceId = ?', [id]);
+      
+      for (const step of steps) {
+        await db.run(
+          `INSERT INTO sequence_steps (id, sequenceId, stepOrder, fullToolName, argsTemplate, pluginId, pluginType, pluginUrl, pluginApiKey, pluginWorkspaceDir) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            step.id || `step-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+            id,
+            step.stepOrder,
+            step.fullToolName,
+            step.argsTemplate,
+            step.pluginId,
+            step.pluginType || 'custom',
+            step.pluginUrl || null,
+            step.pluginApiKey || null,
+            step.pluginWorkspaceDir || null
+          ]
+        );
+      }
+
+      await db.run('COMMIT');
+
+      // 5. 💡 [중요] DB가 변경되었으므로 백그라운드 크론 엔진 알람 주기를 실시간으로 재부팅 갱신합니다.
+      // (이 영역에서 글로벌 sequenceEngine 인스턴스의 스케줄 재로딩 메서드를 호출해 주면 베스트입니다)
+      if ((globalThis as any).sequenceEngine) {
+        await (globalThis as any).sequenceEngine.initializeSchedules().catch(() => {});
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      await db.run('ROLLBACK');
+      console.error('시퀀스 저장 실패:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('mcp:toggle-sequence-status', async (event, { sequenceId, isEnabled }) => {
+    const enabledFlag = isEnabled ? 1 : 0;
+    
+    try {
+      await db.run('BEGIN TRANSACTION');
+
+      // 1. 마스터 테이블의 활성화 플래그만 콕 집어서 업데이트
+      await db.run(
+        'UPDATE automation_sequences SET isEnabled = ?, updatedAt = ? WHERE id = ?',
+        [enabledFlag, Date.now(), sequenceId]
+      );
+
+      // 2. 크론 스케줄 테이블의 활성화 플래그도 세트로 업데이트
+      await db.run(
+        'UPDATE automation_schedules SET isEnabled = ? WHERE sequenceId = ?',
+        [enabledFlag, sequenceId]
+      );
+
+      await db.run('COMMIT');
+
+      // 3. 백그라운드 크론 엔진 알람 주기에 실시간 리로드 신호 주입
+      if ((globalThis as any).sequenceEngine) {
+        await (globalThis as any).sequenceEngine.initializeSchedules().catch(() => {});
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      await db.run('ROLLBACK');
+      console.error('시퀀스 상태 토글 실패:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
 }
 
 const migrateEngines = async () => {
@@ -551,6 +726,16 @@ app.whenReady().then(async () => {
   
   pluginManager = new McpPluginManager(db);
   await pluginManager.loadPlugins();
+
+  // [시퀀스 자동화 엔진 장착]
+  sequenceEngine = new McpSequenceEngine(
+    db,
+    pluginManager,
+    () => globalOnlineStates
+  );
+  await sequenceEngine.initializeSchedules(); // 스케줄 로드
+
+  (globalThis as any).sequenceEngine = sequenceEngine;
 
   await startHealthCheckScheduler();
 

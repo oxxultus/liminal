@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ChatView from './components/ChatView';
 import SettingsView from './components/SettingsView';
 import PluginsView from './components/PluginsView';
+import AutomationView from './components/AutomationView';
 
 export interface EngineConfig {
   id: string;
@@ -85,11 +86,16 @@ const Icon = {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
     </svg>
+  ),
+  Automation: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
   )
 };
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'chat' | 'settings' | 'plugins'>('chat');
+  const [currentView, setCurrentView] = useState<'chat' | 'settings' | 'plugins' | 'automation'>('chat');
   const [engines, setEngines] = useState<EngineConfig[]>([]);
   const [activeEngineId, setActiveEngineId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -233,9 +239,10 @@ export default function App() {
   const activeEngine = engines.find(e => e.id === activeEngineId) || engines[0];
 
   const menuItems = [
-    { view: 'chat' as const,     Icon: Icon.Chat,     label: 'Chat' },
-    { view: 'plugins' as const,  Icon: Icon.Plugin,   label: 'MCP Plugins' },
-    { view: 'settings' as const, Icon: Icon.Settings, label: 'Engine Setup' },
+    { view: 'chat' as const,       Icon: Icon.Chat,       label: 'Chat' },
+    { view: 'plugins' as const,    Icon: Icon.Plugin,     label: 'MCP Plugins' },
+    { view: 'automation' as const, Icon: Icon.Automation, label: 'Automation' },
+    { view: 'settings' as const,   Icon: Icon.Settings,   label: 'Engine Setup' },
   ];
 
   return (
@@ -483,6 +490,8 @@ export default function App() {
             )
           ) : currentView === 'plugins' ? (
             <PluginsView />
+          ): currentView === 'automation' ? (
+            <AutomationView /> 
           ) : (
             <SettingsView engines={engines} activeEngine={activeEngine} onEngineChange={setActiveEngineId} onSave={loadEngines} />
           )}

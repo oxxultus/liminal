@@ -1,5 +1,6 @@
 // src/renderer/components/PluginsView.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 // 자연스러운 레이아웃 전환 애니메이션을 위한 framer-motion 임포트
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -591,200 +592,253 @@ export default function PluginsView() {
           )}
         </section>
 
-        {/* 플러그인 신규 생성 등록 모달 팝업 */}
-        {isAddModalOpen && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(15px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
-          }} onClick={resetForm}>
-            <div style={{
-              width: '460px', padding: '24px', borderRadius: '18px',
-              background: 'var(--bg-modal)',
-              border: 'var(--border-glass)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.2)',
-              display: 'flex', flexDirection: 'column', gap: '16px'
-            }} onClick={e => e.stopPropagation()}>
-              
-              <div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>플러그인 추가 등록</div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>유형을 선택하고 필요한 리소스를 주입하세요.</p>
-              </div>
-
-              <form onSubmit={handleAddPlugin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <div style={labelStyle}>Plugin Type</div>
-                    <select value={pluginType} onChange={(e) => setPluginType(e.target.value as any)} style={inputStyle}>
-                      <option value="remote" style={{ background: 'var(--bg-input)' }}>Remote Endpoint</option>
-                      <option value="custom" style={{ background: 'var(--bg-input)' }}>Download Script</option>
-                      <option value="local" style={{ background: 'var(--bg-input)' }}>Local Script File</option>
-                    </select>
-                  </div>
-                  <div>
-                    <div style={labelStyle}>Plugin Alias</div>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: 파일매니저" required style={inputStyle} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
-                  <input type="text" value={keywordsInput} onChange={e => setKeywordsInput(e.target.value)} placeholder="예: 파일,메모,로그 (미입력 시 상시 대기)" style={inputStyle} />
-                </div>
-
-                {pluginType === 'remote' ? (
-                  <>
-                    <div>
-                      <div style={labelStyle}>Endpoint URL</div>
-                      <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="http://localhost:8080/mcp" required style={inputStyle} />
+        {/* =========================================================================
+           💡 팝업 1: 플러그인 신규 생성 등록 모달 팝업 (Portal 및 가변 상한선 가드 장착)
+           ========================================================================= */}
+        {typeof document !== 'undefined' && createPortal(
+          <AnimatePresence>
+            {isAddModalOpen && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(20px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
+              }} onClick={resetForm}>
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.96, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 15 }}
+                  transition={{ type: 'spring', duration: 0.35 }}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    // 💡 상한선을 고정하여 대형 모니터나 사이드바 오픈 시 미어터지는 깨짐 현상 원천 봉쇄
+                    width: '88vw', maxWidth: '460px', height: 'auto', maxHeight: '85vh',
+                    background: 'var(--bg-modal)', border: 'var(--border-glass)', 
+                    boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4)', borderRadius: '20px',
+                    display: 'flex', flexDirection: 'column', padding: '24px', boxSizing: 'border-box', gap: '16px',
+                    overflowY: 'auto'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* 💡 누락되었던 상단 인라인 레이어 계층 SVG 바인딩 */}
+                      <span style={{ color: '#2563eb', display: 'flex' }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polygon points="2 17 12 22 22 17"/><polygon points="2 12 12 17 22 12"/></svg>
+                      </span>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>플러그인 추가 등록</div>
                     </div>
-                    <div>
-                      <div style={labelStyle}>Security Token</div>
-                      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API 키 보안 토큰" required style={inputStyle} />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {pluginType === 'custom' ? (
+                    {/* 💡 누락되었던 우측 상단 창닫기 SVG 단추 바인딩 */}
+                    <button onClick={resetForm} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  <p style={{ margin: '0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>유형을 선택하고 필요한 리소스를 주입하세요.</p>
+
+                  <form onSubmit={handleAddPlugin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                       <div>
-                        <div style={labelStyle}>Plugin Download URL</div>
-                        <input type="url" value={downloadUrl} onChange={e => setUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../tool.js" required style={inputStyle} />
+                        <div style={labelStyle}>Plugin Type</div>
+                        <select value={pluginType} onChange={(e) => setPluginType(e.target.value as any)} style={inputStyle}>
+                          <option value="remote" style={{ background: 'var(--bg-input)' }}>Remote Endpoint</option>
+                          <option value="custom" style={{ background: 'var(--bg-input)' }}>Download Script</option>
+                          <option value="local" style={{ background: 'var(--bg-input)' }}>Local Script File</option>
+                        </select>
                       </div>
-                    ) : (
                       <div>
-                        <div style={labelStyle}>JavaScript File Path</div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                          <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
-                          <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(128,128,128,0.1)', border: '1px solid rgba(128,128,128,0.15)', color: 'var(--color-text-main)', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
-                            파일 탐색
-                          </button>
+                        <div style={labelStyle}>Plugin Alias</div>
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: 파일매니저" required style={inputStyle} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
+                      <input type="text" value={keywordsInput} onChange={e => setKeywordsInput(e.target.value)} placeholder="예: 파일,메모,로그 (미입력 시 상시 대기)" style={inputStyle} />
+                    </div>
+
+                    {pluginType === 'remote' ? (
+                      <>
+                        <div>
+                          <div style={labelStyle}>Endpoint URL</div>
+                          <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="http://localhost:8080/mcp" required style={inputStyle} />
                         </div>
+                        <div>
+                          <div style={labelStyle}>Security Token</div>
+                          <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API 키 보안 토큰" required style={inputStyle} />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {pluginType === 'custom' ? (
+                          <div>
+                            <div style={labelStyle}>Plugin Download URL</div>
+                            <input type="url" value={downloadUrl} onChange={e => setUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../tool.js" required style={inputStyle} />
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={labelStyle}>JavaScript File Path</div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                              <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
+                              <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(128,128,128,0.1)', border: '1px solid rgba(128,128,128,0.15)', color: 'var(--color-text-main)', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                                파일 탐색
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={useWorkspace} 
+                              onChange={(e) => {
+                                setUseWorkspace(e.target.checked);
+                                if(!e.target.checked) setPluginWorkspaceDir('');
+                              }}
+                              style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                            />
+                            파일 작업 디렉토리(Workspace) 연동하기
+                          </label>
+
+                          {useWorkspace && (
+                            <div style={{ width: '100%' }}>
+                              <input 
+                                type="text" 
+                                value={pluginWorkspaceDir} 
+                                onChange={e => setPluginWorkspaceDir(e.target.value)} 
+                                placeholder={pluginType === 'custom' ? "파일 작업 전용 디렉토리 절대경로" : "실제 파일 연동이 일어날 빈 작업 폴더 경로"} 
+                                required={useWorkspace} 
+                                style={inputStyle} 
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {statusMsg && (
+                      <div style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        {statusMsg}
                       </div>
                     )}
 
-                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={useWorkspace} 
-                          onChange={(e) => {
-                            setUseWorkspace(e.target.checked);
-                            if(!e.target.checked) setPluginWorkspaceDir('');
-                          }}
-                          style={{ cursor: 'pointer', width: '15px', height: '15px' }}
-                        />
-                        파일 작업 디렉토리(Workspace) 연동하기
-                      </label>
-
-                      {useWorkspace && (
-                        <div style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
-                          <input 
-                            type="text" 
-                            value={pluginWorkspaceDir} 
-                            onChange={e => setPluginWorkspaceDir(e.target.value)} 
-                            placeholder={pluginType === 'custom' ? "파일 작업 전용 디렉토리 절대경로" : "실제 파일 연동이 일어날 빈 작업 폴더 경로"} 
-                            required={useWorkspace} 
-                            style={inputStyle} 
-                          />
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                      <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
+                        취소
+                      </button>
+                      <button type="submit" style={{ padding: '9px 16px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                        Activate
+                      </button>
                     </div>
-                  </>
-                )}
-
-                {statusMsg && <div style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 600 }}>{statusMsg}</div>}
-
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
-                  <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-                    취소
-                  </button>
-                  <button type="submit" style={{ padding: '9px 16px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
-                    Activate
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
 
-        {/* 플러그인 정보 수정 모달 팝업 */}
-        {isEditModalOpen && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(15px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
-          }} onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }}>
-            <div style={{
-              width: '360px', padding: '24px', borderRadius: '16px',
-              background: 'var(--bg-modal)',
-              border: 'var(--border-glass)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
-              display: 'flex', flexDirection: 'column', gap: '16px'
-            }} onClick={e => e.stopPropagation()}>
-              
-              <div>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>플러그인 정보 수정</div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>별칭 이름, 트리거 컨텍스트 필터 및 작업 공간을 수정합니다.</p>
-              </div>
-
-              <div>
-                <div style={labelStyle}>Plugin Alias</div>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="새로운 플러그인 별칭 이름"
-                  autoFocus
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
-                <input
-                  type="text"
-                  value={keywordsInput}
-                  onChange={e => setKeywordsInput(e.target.value)}
-                  placeholder="예: 파일,메모,백업 (비워두면 상시 가동)"
-                  style={inputStyle}
-                />
-              </div>
-
-              {installedPlugins.find(p => p.id === targetPluginId)?.type !== 'remote' && (
-                <div style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
-                  <div style={labelStyle}>파일 작업 디렉토리(Workspace) 경로</div>
-                  <input
-                    type="text"
-                    value={pluginWorkspaceDir}
-                    onChange={e => setPluginWorkspaceDir(e.target.value)}
-                    placeholder="지정 폴더 절대 경로 (미입력 시 격리 세팅 유지)"
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleSaveEditPopup();
-                      if (e.key === 'Escape') { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }
-                    }}
-                    style={inputStyle}
-                  />
-                </div>
-              )}
-              
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }}
-                  style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}
-                >취소</button>
-                <button
-                  type="button"
-                  onClick={handleSaveEditPopup}
-                  disabled={!name.trim()}
-                  style={{ 
-                    padding: '8px 14px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '6px', 
-                    fontSize: '0.82rem', fontWeight: 600, 
-                    cursor: name.trim() ? 'pointer' : 'not-allowed', opacity: name.trim() ? 1 : 0.5 
+        {/* =========================================================================
+           💡 팝업 2: 플러그인 기존 정보 수정 모달 팝업 (Portal 및 가변 상한선 가드 장착)
+           ========================================================================= */}
+        {typeof document !== 'undefined' && createPortal(
+          <AnimatePresence>
+            {isEditModalOpen && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(20px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
+              }} onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }}>
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.96, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 15 }}
+                  transition={{ type: 'spring', duration: 0.35 }}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    width: '88vw', maxWidth: '400px', height: 'auto', maxHeight: '85vh',
+                    background: 'var(--bg-modal)', border: 'var(--border-glass)', 
+                    boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4)', borderRadius: '20px',
+                    display: 'flex', flexDirection: 'column', padding: '22px', boxSizing: 'border-box', gap: '16px',
+                    overflowY: 'auto'
                   }}
-                >저장</button>
-              </div>
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* 💡 누락되었던 핀 마킹 수정 전용 SVG 바인딩 */}
+                      <span style={{ color: '#2563eb', display: 'flex' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.12-2.58A2 2 0 0 1 16 10.18V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5.18a2 2 0 0 1-.44 1.24L5.44 14a2 2 0 0 0-.44 1.24z"/></svg>
+                      </span>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>플러그인 정보 수정</div>
+                    </div>
+                    <button onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  <p style={{ margin: '0', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>별칭 이름, 트리거 컨텍스트 필터 및 작업 공간을 수정합니다.</p>
 
-            </div>
-          </div>
+                  <div>
+                    <div style={labelStyle}>Plugin Alias</div>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="새로운 플러그인 별칭 이름"
+                      autoFocus
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
+                    <input
+                      type="text"
+                      value={keywordsInput}
+                      onChange={e => setKeywordsInput(e.target.value)}
+                      placeholder="예: 파일,메모,백업 (비워두면 상시 가동)"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {installedPlugins.find(p => p.id === targetPluginId)?.type !== 'remote' && (
+                    <div style={{ width: '100%' }}>
+                      <div style={labelStyle}>파일 작업 디렉토리(Workspace) 경로</div>
+                      <input
+                        type="text"
+                        value={pluginWorkspaceDir}
+                        onChange={e => setPluginWorkspaceDir(e.target.value)}
+                        placeholder="지정 폴더 절대 경로 (미입력 시 격리 세팅 유지)"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveEditPopup();
+                          if (e.key === 'Escape') { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }
+                        }}
+                        style={inputStyle}
+                      />
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }}
+                      style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}
+                    >취소</button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEditPopup}
+                      disabled={!name.trim()}
+                      style={{ 
+                        padding: '8px 14px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '6px', 
+                        fontSize: '0.82rem', fontWeight: 600, 
+                        cursor: name.trim() ? 'pointer' : 'not-allowed', opacity: name.trim() ? 1 : 0.5 
+                      }}
+                    >저장</button>
+                  </div>
+
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
 
       </div>

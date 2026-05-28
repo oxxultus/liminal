@@ -45,4 +45,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 
   toggleMcpPlugin: (payload: { pluginId: string; enabled: boolean }) => ipcRenderer.invoke('mcp:toggle-plugin', payload),
+
+  // 자동화
+  getAutomationSequences: () => ipcRenderer.invoke('mcp:get-automation-sequences'),
+  saveAutomationSequence: (payload: any) => ipcRenderer.invoke('mcp:save-automation-sequence', payload),
+  triggerSequenceNow: (sequenceId: string) => ipcRenderer.invoke('mcp:trigger-sequence-now', sequenceId),
+  deleteAutomationSequence: (sequenceId: string) => ipcRenderer.invoke('mcp:delete-automation-sequence', sequenceId),
+  toggleSequenceStatus: (payload: any) => ipcRenderer.invoke('mcp:toggle-sequence-status', payload),
+
+  onSequenceStatus: (callback: (data: {
+    sequenceId: string;
+    status: 'running' | 'completed' | 'failed';
+    stepIndex: number | null;
+    error?: string;
+  }) => void) =>
+    ipcRenderer.on('sequence:status', (_, data) => callback(data)),
+
+  offSequenceStatus: () =>
+    ipcRenderer.removeAllListeners('sequence:status'),
+  
 });

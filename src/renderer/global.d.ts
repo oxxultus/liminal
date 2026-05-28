@@ -7,10 +7,24 @@ export interface IElectronAPI {
   getMcpPluginsList: () => Promise<any[]>;
   removeMcpPlugin: (pluginId: string) => Promise<{ success: boolean; error?: string }>;
   openFileDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>;
+
+  // --- 자동화 시퀀스 파이프라인 브릿지 ---
+  getAutomationSequences: () => Promise<any[]>;
+  saveAutomationSequence: (payload: any) => Promise<{ success: boolean; error?: string }>;
+  triggerSequenceNow: (sequenceId: string) => Promise<{ success: boolean; error?: string }>;
+  deleteAutomationSequence: (sequenceId: string) => Promise<{ success: boolean; error?: string }>;
+  toggleSequenceStatus: (payload: { sequenceId: string; isEnabled: boolean }) => Promise<{ success: boolean; error?: string }>;
+
+  onSequenceStatus: (callback: (data: {
+    sequenceId: string;
+    status: 'running' | 'completed' | 'failed';
+    stepIndex: number | null;
+    error?: string;
+  }) => void) => void;
+  offSequenceStatus: () => void;
+
   
-  // =========================================================================
-  // 💡 [정리 병합] 하단에 따로 놀던 중복 선언 소켓을 완벽하게 통합 매핑 마감
-  // =========================================================================
+  // --- 통합 매핑 소켓 ---
   addMcpPlugin: (config: any) => Promise<{ success: boolean; tools?: any[]; version?: string; error?: string }>;
   toggleMcpPlugin: (payload: { pluginId: string; enabled: boolean }) => Promise<{ success: boolean; error?: string }>;
   checkRemoteStatus: (payload: { url: string; apiKey: string }) => Promise<boolean>;
@@ -32,10 +46,7 @@ export interface IElectronAPI {
   getMessages: (sessionId: string) => Promise<any[]>;
   saveMessage: (message: { id: string; sessionId: string; role: string; content: string }) => Promise<{ success: boolean }>;
   
-  // =========================================================================
-  // 💡 [하이브리드 미디어 컴포저 인터페이스 스택]
-  //    물리 디스크 이미지 쓰기 및 세션 가비지 컬렉터 연쇄 파쇄 핸들러 타이핑 등록
-  // =========================================================================
+  // --- 하이브리드 미디어 미디어 컴포저 인터페이스 스택 ---
   uploadLocalImage: (payload: { name: string; base64Data: string }) => Promise<{ success: boolean; localPath?: string; error?: string }>;
   deleteSessionImages: (payload: { sessionId: string }) => Promise<{ success: boolean; deletedCount?: number; error?: string }>;
 
@@ -44,12 +55,14 @@ export interface IElectronAPI {
   saveSummary: (args: { id: string; sessionId: string; summary: string; coveredUpTo: number }) => Promise<{ success: boolean }>;
 }
 
+// ── 💡 [탈출 완료] 상단 명시적 import를 지우고 declare global 스콥을 완전한 전역 공간으로 복원 ──
 declare global {
   interface Window {
     electronAPI: IElectronAPI;
   }
 }
 
+// 리액트 CSS 가드 드래그 리전 타이핑 확장
 declare module 'react' {
   interface CSSProperties {
     WebkitAppRegion?: 'drag' | 'no-drag';

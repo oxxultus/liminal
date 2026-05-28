@@ -1,6 +1,7 @@
 // src/renderer/components/SettingsView.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { EngineConfig } from '../App';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Icon = {
@@ -339,141 +340,180 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
           )}
         </section>
 
-        {/* ── 팝업 1: AI 엔진 명세 생성 추가 신규 모달 레이어 ── */}
-        {isAddModalOpen && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(15px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
-          }} onClick={resetForm}>
-            <div style={{
-              width: '460px', padding: '24px', borderRadius: '18px',
-              background: 'var(--bg-modal)',
-              border: 'var(--border-glass)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.2)',
-              display: 'flex', flexDirection: 'column', gap: '16px'
-            }} onClick={e => e.stopPropagation()}>
-              
-              <div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>AI 코어 엔진 등록</div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>가동할 인공지능 명세 주소와 식별자를 연동 마운트합니다.</p>
+        {/* ── 💡 팝업 1: AI 엔진 명세 생성 추가 신규 모달 레이어 (Portal 및 가드가 완비된 와이드 캡슐) ── */}
+        {typeof document !== 'undefined' && createPortal(
+          <AnimatePresence>
+            {isAddModalOpen && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(20px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
+              }} onClick={resetForm}>
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.96, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 15 }}
+                  transition={{ type: 'spring', duration: 0.35 }}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    width: '88vw', maxWidth: '460px', height: 'auto', maxHeight: '85vh',
+                    background: 'var(--bg-modal)', border: 'var(--border-glass)', 
+                    boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4)', borderRadius: '20px',
+                    display: 'flex', flexDirection: 'column', padding: '24px', boxSizing: 'border-box', gap: '16px',
+                    overflowY: 'auto'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: '#2563eb', display: 'flex' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="24"/><line x1="15" y1="20" x2="15" y2="24"/><line x1="20" y1="9" x2="24" y2="9"/><line x1="20" y1="15" x2="24" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+                      </span>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>AI 코어 엔진 등록</div>
+                    </div>
+                    <button onClick={resetForm} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  <p style={{ margin: '0', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>가동할 인공지능 명세 주소와 식별자를 연동 마운트합니다.</p>
+
+                  <form onSubmit={handleAddEngine} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div>
+                        <div style={labelStyle}>Provider</div>
+                        <select value={provider} onChange={(e) => setProvider(e.target.value as any)} style={inputStyle}>
+                          <option value="openai" style={{ background: 'var(--bg-input)' }}>OpenAI</option>
+                          <option value="anthropic" style={{ background: 'var(--bg-input)' }}>Anthropic</option>
+                          <option value="google" style={{ background: 'var(--bg-input)' }}>Google</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={labelStyle}>Engine Name</div>
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: GPT-4o" required style={inputStyle} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={labelStyle}>Endpoint Base URL</div>
+                      <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://api.openai.com/v1" required style={inputStyle} />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div>
+                        <div style={labelStyle}>Model Identifier</div>
+                        <input type="text" value={model} onChange={e => setModel(e.target.value)} placeholder="예: gpt-4o" required style={inputStyle} />
+                      </div>
+                      <div>
+                        <div style={labelStyle}>Secret API Key</div>
+                        <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." style={inputStyle} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                      <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
+                        취소
+                      </button>
+                      <button type="submit" style={{ padding: '9px 16px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                        Activate Engine
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
               </div>
-
-              <form onSubmit={handleAddEngine} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <div style={labelStyle}>Provider</div>
-                    <select value={provider} onChange={(e) => setProvider(e.target.value as any)} style={inputStyle}>
-                      <option value="openai" style={{ background: 'var(--bg-input)' }}>OpenAI</option>
-                      <option value="anthropic" style={{ background: 'var(--bg-input)' }}>Anthropic</option>
-                      <option value="google" style={{ background: 'var(--bg-input)' }}>Google</option>
-                    </select>
-                  </div>
-                  <div>
-                    <div style={labelStyle}>Engine Name</div>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: GPT-4o" required style={inputStyle} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={labelStyle}>Endpoint Base URL</div>
-                  <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://api.openai.com/v1" required style={inputStyle} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <div style={labelStyle}>Model Identifier</div>
-                    <input type="text" value={model} onChange={e => setModel(e.target.value)} placeholder="예: gpt-4o" required style={inputStyle} />
-                  </div>
-                  <div>
-                    <div style={labelStyle}>Secret API Key</div>
-                    <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." style={inputStyle} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
-                  <button type="button" onClick={resetForm} style={{ padding: '9px 16px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-                    취소
-                  </button>
-                  <button type="submit" style={{ padding: '9px 16px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
-                    Activate Engine
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
 
-        {/* ── 팝업 2: 등록된 기존 AI 엔진 통합 수정 모달 레이어 ── */}
-        {isEditModalOpen && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(10px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
-          }} onClick={() => { setIsEditModalOpen(false); setTargetEngineId(null); }}>
-            <div style={{
-              width: '420px', padding: '24px', borderRadius: '16px',
-              background: 'var(--bg-modal)',
-              border: 'var(--border-glass)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)',
-              display: 'flex', flexDirection: 'column', gap: '14px'
-            }} onClick={e => e.stopPropagation()}>
-              
-              <div>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>엔진 설정 명세 수정</div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>해당 코어 인공지능의 연동 명세 구조를 재정비합니다.</p>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div>
-                  <div style={labelStyle}>Provider</div>
-                  <select value={provider} onChange={(e) => setProvider(e.target.value as any)} style={inputStyle}>
-                    <option value="openai" style={{ background: 'var(--bg-input)' }}>OpenAI</option>
-                    <option value="anthropic" style={{ background: 'var(--bg-input)' }}>Anthropic</option>
-                    <option value="google" style={{ background: 'var(--bg-input)' }}>Google</option>
-                  </select>
-                </div>
-                <div>
-                  <div style={labelStyle}>Engine Name</div>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="엔진 표시명" required style={inputStyle} />
-                </div>
-              </div>
-
-              <div>
-                <div style={labelStyle}>Endpoint Base URL</div>
-                <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="엔드포인트 API 주소" required style={inputStyle} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div>
-                  <div style={labelStyle}>Model Identifier</div>
-                  <input type="text" value={model} onChange={e => setModel(e.target.value)} placeholder="모델 식별 코드명" required style={inputStyle} />
-                </div>
-                <div>
-                  <div style={labelStyle}>Secret API Key</div>
-                  <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." style={inputStyle} />
-                </div>
-              </div>
-              
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => { setIsEditModalOpen(false); setTargetEngineId(null); }}
-                  style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}
-                >취소</button>
-                <button
-                  type="button"
-                  onClick={handleSaveEditPopup}
-                  disabled={!name.trim() || !url.trim() || !model.trim()}
-                  style={{ 
-                    padding: '8px 14px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '6px', 
-                    fontSize: '0.82rem', fontWeight: 600, 
-                    cursor: (name.trim() && url.trim() && model.trim()) ? 'pointer' : 'not-allowed', 
-                    opacity: (name.trim() && url.trim() && model.trim()) ? 1 : 0.5 
+        {/* ── 💡 팝업 2: 등록된 기존 AI 엔진 통합 수정 모달 레이어 (Portal 및 가드가 완비된 와이드 캡슐) ── */}
+        {typeof document !== 'undefined' && createPortal(
+          <AnimatePresence>
+            {isEditModalOpen && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(20px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
+              }} onClick={() => { setIsEditModalOpen(false); setTargetEngineId(null); }}>
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.96, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 15 }}
+                  transition={{ type: 'spring', duration: 0.35 }}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    width: '88vw', maxWidth: '420px', height: 'auto', maxHeight: '85vh',
+                    background: 'var(--bg-modal)', border: 'var(--border-glass)', 
+                    boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4)', borderRadius: '20px',
+                    display: 'flex', flexDirection: 'column', padding: '24px', boxSizing: 'border-box', gap: '14px',
+                    overflowY: 'auto'
                   }}
-                >저장</button>
-              </div>
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: '#2563eb', display: 'flex' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>
+                      </span>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>엔진 설정 명세 수정</div>
+                    </div>
+                    <button onClick={() => { setIsEditModalOpen(false); setTargetEngineId(null); }} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  <p style={{ margin: '0', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>해당 코어 인공지능의 연동 명세 구조를 재정비합니다.</p>
 
-            </div>
-          </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    <div>
+                      <div style={labelStyle}>Provider</div>
+                      <select value={provider} onChange={(e) => setProvider(e.target.value as any)} style={inputStyle}>
+                        <option value="openai" style={{ background: 'var(--bg-input)' }}>OpenAI</option>
+                        <option value="anthropic" style={{ background: 'var(--bg-input)' }}>Anthropic</option>
+                        <option value="google" style={{ background: 'var(--bg-input)' }}>Google</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Engine Name</div>
+                      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="엔진 표시명" required style={inputStyle} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Endpoint Base URL</div>
+                    <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="엔드포인트 API 주소" required style={inputStyle} />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    <div>
+                      <div style={labelStyle}>Model Identifier</div>
+                      <input type="text" value={model} onChange={e => setModel(e.target.value)} placeholder="모델 식별 코드명" required style={inputStyle} />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Secret API Key</div>
+                      <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." style={inputStyle} />
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setIsEditModalOpen(false); setTargetEngineId(null); }}
+                      style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}
+                    >취소</button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEditPopup}
+                      disabled={!name.trim() || !url.trim() || !model.trim()}
+                      style={{ 
+                        padding: '8px 14px', border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', borderRadius: '6px', 
+                        fontSize: '0.82rem', fontWeight: 600, 
+                        cursor: (name.trim() && url.trim() && model.trim()) ? 'pointer' : 'not-allowed', 
+                        opacity: (name.trim() && url.trim() && model.trim()) ? 1 : 0.5 
+                      }}
+                    >저장</button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
 
       </div>
