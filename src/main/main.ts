@@ -133,7 +133,9 @@ function registerIpcHandlers() {
     catch (error: any) { return { success: false, error: error.message }; }
   });
 
-  // 💡 [통합] 단일 창구로 진화한 플러그인 등록 가동 핸들러
+  // =========================================================================
+  // 💡 [통합] 단일 창구로 진화한 플러그인 등록 가동 핸들러 (버전 수급 기능 이식)
+  // =========================================================================
   ipcMain.handle('mcp:add-plugin', async (_event, config) => {
     try {
       const pluginsDir = path.join(app.getPath('userData'), 'external_plugins');
@@ -143,24 +145,23 @@ function registerIpcHandlers() {
       
       if (config.type === 'custom' && targetFilePath) {
         const pluginId = config.id || `custom-${Date.now()}`;
-        
         const ext = path.extname(targetFilePath) || '.js';
         const filename = `${pluginId}${ext}`;
         const destinationPath = path.join(pluginsDir, filename);
 
         if (targetFilePath.startsWith('http://') || targetFilePath.startsWith('https://')) {
-          console.log(`🌐 원격 스크립트 다운로드 덤프: ${targetFilePath}`);
           const response = await axios.get(targetFilePath, { responseType: 'text' });
           await fsPromises.writeFile(destinationPath, response.data, 'utf-8');
           targetFilePath = destinationPath;
         } 
-        else if (fs.existsSync(targetFilePath)) {
-          console.log(`📂 로컬 스크립트 격리 복사: ${targetFilePath} -> ${destinationPath}`);
+        else if (fs.existsSync(targetFilePath) && !targetFilePath.includes('external_plugins')) {
+          // 💡 이미 격리 폴더에 들어있는 파일이 아닐 때만 격리 복사 수행 (수정 시 오동작 방지)
           await fsPromises.copyFile(targetFilePath, destinationPath);
           targetFilePath = destinationPath;
         }
       }
 
+      // 💡 [수정] 모달에서 넘겨준 수정본 workspaceDir이 있다면 우선 적용, 없다면 기존 pluginsDir 폴백
       const resolvedWorkspaceDir = config.type === 'custom'
         ? (config.workspaceDir?.trim() || pluginsDir)
         : undefined;
@@ -172,10 +173,24 @@ function registerIpcHandlers() {
       };
 
       const tools = await pluginManager.registerNewPlugin(finalConfig);
-      return { success: true, tools };
+
+      // =========================================================================
+      // 🎯 [핀포인트 핫 리로드] 수정 저장이 일어난 직후, 
+      //     해당 플러그인 인스턴스 하나만 즉시 프로세스를 내렸다가 새 경로로 재부팅시킵니다!
+      // =========================================================================
+      if (pluginManager && config.enabled !== false) {
+        console.log(`🔄 [Main Sync] 설정 변경 감지로 인한 단일 핫 리로드 가동: ${config.name}`);
+        await pluginManager.toggleSinglePlugin(config.id, false); // 메모리에서 내리고 프로세스 Kill
+        await pluginManager.toggleSinglePlugin(config.id, true);  // 새 설정(Workspace)으로 프로세스 부팅
+      }
+      
+      const loadedPlugin = (pluginManager as any).plugins.get(config.id);
+      const activeVersion = loadedPlugin?.version || finalConfig.version || '1.0.0';
+
+      return { success: true, tools, version: activeVersion };
 
     } catch (error: any) {
-      console.error('🚨 플러그인 통합 등록 실패:', error);
+      console.error('🚨 플러그인 통합 등록 및 수정 실패:', error);
       return { success: false, error: error.message };
     }
   });

@@ -14,6 +14,8 @@ export interface IElectronAPI {
   checkRemoteStatus: (payload: { url: string; apiKey: string }) => Promise<boolean>;
   // src/renderer/global.d.ts 내부에 추가
   toggleMcpPlugin: (payload: { pluginId: string; enabled: boolean }) => Promise<{ success: boolean; error?: string }>;
+  // global.d.ts의 addMcpPlugin 반환 구조체에 version?: string 추가
+  addMcpPlugin: (config: any) => Promise<{ success: boolean; tools?: any[]; version?: string; error?: string }>;
 
   // --- 엔진 관리 브릿지 ---
   getEngines: () => Promise<any[]>;

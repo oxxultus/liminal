@@ -45,6 +45,8 @@ export class McpPluginManager {
   async registerNewPlugin(config: PluginConfig): Promise<any[]> {
     const scriptPath = config.url || (config as any).scriptPath;
     const workspaceDir = config.workspaceDir?.trim();
+    // 💡 프론트엔드에서 올라온 버전 명세 확보 (기본값 설정)
+    const finalVersion = config.version || '1.0.0';
 
     const keywordsStr = Array.isArray(config.keywords)
       ? config.keywords.join(',')
@@ -58,14 +60,18 @@ export class McpPluginManager {
 
     const tools = await plugin.listTools();
 
+    // 💡 원격 플러그인 등에서 동적으로 분석해낸 런타임 버전이 있다면 매핑 규칙 반영
+    const discoveredVersion = (plugin as any).version || finalVersion;
+
     if (tools.length === 0 && config.type === 'remote') {
       this.plugins.delete(config.id);
       throw new Error('플러그인 연결 실패 또는 사용 가능한 도구가 없습니다.');
     }
 
+    // 💡 UPSERT 처리 시 version 데이터 컬럼 누락 방지 매핑
     await this.db.run(
-      `INSERT INTO mcp_plugins (id, type, name, url, apiKey, workspaceDir, keywords, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+      `INSERT INTO mcp_plugins (id, type, name, url, apiKey, workspaceDir, keywords, version, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
        ON CONFLICT(id) DO UPDATE SET
          type = excluded.type,
          name = excluded.name,
@@ -73,6 +79,7 @@ export class McpPluginManager {
          apiKey = excluded.apiKey,
          workspaceDir = excluded.workspaceDir,
          keywords = excluded.keywords,
+         version = excluded.version,
          enabled = 1`,
       [
         config.id,
@@ -82,6 +89,7 @@ export class McpPluginManager {
         config.apiKey ?? null,
         workspaceDir ?? null,
         keywordsStr,
+        discoveredVersion // 💡 버전 데이터 주입
       ]
     );
 
@@ -93,6 +101,8 @@ export class McpPluginManager {
     return rows.map(r => ({
       ...r,
       enabled: r.enabled === 1,
+      // 💡 DB 스키마로부터 version 문자열을 안전하게 주입
+      version: r.version || '1.0.0',
       keywords: r.keywords
         ? r.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
         : []
@@ -137,6 +147,10 @@ export class McpPluginManager {
         config.url,
         config.apiKey || ''
       );
+      // 💡 초기화 로드 시점에 기존 캐싱된 버전을 복원 주입
+      if (config.version) {
+        (plugin as any).version = config.version;
+      }
       this.plugins.set(config.id, plugin);
       return plugin;
     }
@@ -291,6 +305,7 @@ export class McpPluginManager {
 
     return await plugin.callTool(fullToolName, args);
   }
+
   /**
    * 💡 [신규 추가] 특정 플러그인 하나만 조준해서 메모리 상태를 토글 제어합니다.
    */
@@ -300,7 +315,6 @@ export class McpPluginManager {
       if (!enabled) {
         const plugin = this.plugins.get(pluginId);
         if (plugin) {
-          // Stdio 타입인 경우 가동 중인 자식 프로세스 안전 종료
           if (typeof (plugin as any).kill === 'function') {
             (plugin as any).kill();
           }
@@ -314,17 +328,15 @@ export class McpPluginManager {
       const config = await this.db.get('SELECT * FROM mcp_plugins WHERE id = ?', [pluginId]);
       if (!config) throw new Error('존재하지 않는 플러그인 레코드입니다.');
 
-      // 안전장치 검증 (스크립트 파일 유실 체크)
       if (config.type === 'custom' && config.url && !fs.existsSync(config.url)) {
         console.warn(`⚠️ [단독 활성화 실패] 물리 파일이 디스크에 없습니다: ${config.url}`);
         return;
       }
 
-      // 단독 초기화 유닛 가동
       await this.initializePlugin({
         ...config,
         enabled: true,
-        // DB의 쉼표 문자열을 배열 구조체로 정제해서 전달
+        version: config.version || '1.0.0', // 💡 단독 로드 시에도 버전 유지 복원
         keywords: config.keywords ? config.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : []
       });
       console.log(`🚀 [PluginManager] 플러그인 단독 메모리 적재 성공: ${config.name}`);

@@ -1,5 +1,4 @@
 // src/main/mcp/types.ts
-
 export interface McpTool {
   name: string;
   description: string;
@@ -20,11 +19,12 @@ export interface McpPlugin {
 
 export interface PluginConfig {
   id: string;
-  type: 'remote' | 'custom'; // 💡 'local'을 완벽히 도려내어 파이프라인 단순화
+  type: 'remote' | 'custom'; 
   name: string;
   url?: string;
   apiKey?: string;
   workspaceDir?: string;
   enabled: boolean;
-  keywords?: string[]; // 💡 [신규] 해당 플러그인을 트리거할 연관 키워드 목록
+  keywords?: string[];
+  version?: string; 
 }

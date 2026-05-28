@@ -14,6 +14,9 @@ export class RemoteHttpMcpPlugin implements McpPlugin {
   public filePath?: string = undefined;     // 원격 타입이므로 없음
   public workspaceDir?: string = undefined; // 원격 타입이므로 없음
 
+  // 💡 [신규 추가] 원격 서버가 내려주는 버전을 동적으로 보관할 런타임 변수
+  public version: string = '1.0.0'; 
+
   constructor(id: string, name: string, url: string, apiKey: string) {
     this.id = id;
     this.name = name;
@@ -29,6 +32,14 @@ export class RemoteHttpMcpPlugin implements McpPlugin {
         headers: { 'X-API-KEY': this.apiKey },
         timeout: 5000 // 연결 컨텍스트를 고려해 5초로 약간 여유를 둡니다.
       });
+
+      // =========================================================================
+      // 💡 [신규 추가] FastAPI 응답 루트 바디에 version 명세가 포함되어 있다면 동적 수급
+      // =========================================================================
+      if (response.data && response.data.version) {
+        this.version = String(response.data.version).trim();
+        console.log(`📡 [${this.name}] 원격 서버 실시간 버전 감지 동기화 완료: v${this.version}`);
+      }
 
       const tools = response.data?.tools ?? [];
 

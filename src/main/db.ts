@@ -34,7 +34,7 @@ export async function initDb() {
       updatedAt INTEGER
     );
 
-    -- 3. 메시지 테이블
+    -- 3. messages 테이블
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       sessionId TEXT,
@@ -44,7 +44,7 @@ export async function initDb() {
       FOREIGN KEY(sessionId) REFERENCES chat_sessions(id) ON DELETE CASCADE
     );
 
-    -- 4. 플러그인 설정 테이블 (구조 간소화 및 역할 명확화)
+    -- 4. 플러그인 설정 테이블 (통합 및 스펙 일원화 패치 완료)
     CREATE TABLE IF NOT EXISTS mcp_plugins (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -52,7 +52,8 @@ export async function initDb() {
       url TEXT,
       apiKey TEXT,
       workspaceDir TEXT,
-      keywords TEXT,                      -- 💡 [신규 추가] 콤마로 구분된 키워드 저장소 (예: "파일,메모,로그")
+      keywords TEXT,
+      version TEXT DEFAULT '1.0.0',       -- 💡 하단 메서드를 없애고 여기에 완전히 통일 및 정착
       enabled INTEGER NOT NULL DEFAULT 1
     );
 
@@ -70,6 +71,8 @@ export async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(sessionId);
     CREATE INDEX IF NOT EXISTS idx_summaries_session ON session_summaries(sessionId);
   `);
+
+  console.log("💾 [DB Engine] SQLite 스키마 최적화 동기화 완료");
   
   return db;
 }

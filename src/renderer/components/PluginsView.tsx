@@ -1,6 +1,5 @@
 // src/renderer/components/PluginsView.tsx
 import React, { useState, useEffect, useRef } from 'react';
-// 💡 [신규 추가] 자연스러운 레이아웃 전환 애니메이션을 위한 framer-motion 임포트
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Icon = {
@@ -201,11 +200,18 @@ export default function PluginsView() {
     }
   };
 
-  const handleStartEditModal = (id: string, currentName: string, currentKeywords: any) => {
-    setTargetPluginId(id);
-    setName(currentName);
-    const keywordsStr = Array.isArray(currentKeywords) ? currentKeywords.join(',') : String(currentKeywords || '');
+  // 💡 [수정] 수정 모달 진입 시 기존에 기입되어 있던 워크스페이스 명세까지 인풋 폼에 바인딩
+  const handleStartEditModal = (plugin: any) => {
+    setTargetPluginId(plugin.id);
+    setName(plugin.name);
+    
+    const keywordsStr = Array.isArray(plugin.keywords) 
+      ? plugin.keywords.join(',') 
+      : String(plugin.keywords || '');
     setKeywordsInput(keywordsStr);
+    
+    // 워크스페이스 복원 기입
+    setPluginWorkspaceDir(plugin.workspaceDir || '');
     
     setIsEditModalOpen(true);
     setMenuOpenPluginId(null);
@@ -227,7 +233,9 @@ export default function PluginsView() {
       name: name.trim(),
       url: targetPlugin.url || targetPlugin.scriptPath,
       apiKey: targetPlugin.apiKey,
-      workspaceDir: targetPlugin.workspaceDir,
+      version: targetPlugin.version,
+      // 💡 [수정] 수정된 워크스페이스 경로 주입
+      workspaceDir: pluginWorkspaceDir.trim() || undefined,
       keywords: parsedKeywords,
       enabled: targetPlugin.enabled 
     };
@@ -238,6 +246,7 @@ export default function PluginsView() {
       setTargetPluginId(null);
       setName('');
       setKeywordsInput('');
+      setPluginWorkspaceDir('');
       refreshPluginsList();
     } else {
       alert(`정보 수정 실패: ${res.error}`);
@@ -369,7 +378,6 @@ export default function PluginsView() {
               장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
             </div>
           ) : (
-            // 💡 [변경] framer-motion이 하위 컴포넌트들의 레이아웃 흐름 변형을 추적하도록 div ➡️ motion.div 래핑
             <motion.div 
               layout 
               style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', width: '100%' }}
@@ -384,7 +392,6 @@ export default function PluginsView() {
                   const isServerOnline = onlineStates[p.id] ?? false;
 
                   return (
-                    // 💡 [변경] 카드가 삭제되거나 정렬 바뀔 때 유연하게 애니메이션을 타도록 motion.div 이식 및 layout 속성 주입
                     <motion.div 
                       key={p.id}
                       layout
@@ -409,7 +416,7 @@ export default function PluginsView() {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '52%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '58%' }}>
                           <span style={{ color: 'var(--color-text-muted)', opacity: isEnabled ? 0.8 : 0.4, display: 'flex', alignItems: 'center' }}>
                             {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
                           </span>
@@ -418,6 +425,21 @@ export default function PluginsView() {
                             fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)',
                             opacity: isEnabled ? 1 : 0.6
                           }}>{p.name}</span>
+
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            fontFamily: 'monospace',
+                            color: 'var(--color-text-muted)',
+                            backgroundColor: 'rgba(128, 128, 128, 0.08)',
+                            padding: '2px 5px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(128, 128, 128, 0.12)',
+                            flexShrink: 0,
+                            opacity: isEnabled ? 0.85 : 0.4
+                          }}>
+                            v{p.version || '1.0.0'}
+                          </span>
                         </div>
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, position: 'relative' }}>
@@ -449,7 +471,6 @@ export default function PluginsView() {
                             {p.type}
                           </span>
 
-                          {/* 활성화 상태일 때 아름다운 초록색(#10b981) 스위치 배경 렌더링 및 내부 원형 수직 정중앙 매칭 */}
                           <div 
                             onClick={() => handleToggleEnable(p.id, isEnabled)}
                             style={{
@@ -543,8 +564,9 @@ export default function PluginsView() {
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >
+                          {/* 💡 [수정] 인자 규격을 p(단일 객체) 형태로 우아하게 위임 유도 */}
                           <button
-                            onClick={() => handleStartEditModal(p.id, p.name, p.keywords)}
+                            onClick={() => handleStartEditModal(p)}
                             style={{
                               display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
                               border: 'none', background: 'transparent', borderRadius: '6px',
@@ -701,7 +723,7 @@ export default function PluginsView() {
             position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
             backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(15px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
-          }} onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); }}>
+          }} onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }}>
             <div style={{
               width: '360px', padding: '24px', borderRadius: '16px',
               background: 'var(--bg-modal)',
@@ -711,7 +733,7 @@ export default function PluginsView() {
               
               <div>
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)' }}>플러그인 정보 수정</div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>별칭 이름과 트리거 컨텍스트 필터를 수정합니다.</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>별칭 이름, 트리거 컨텍스트 필터 및 작업 공간을 수정합니다.</p>
               </div>
 
               <div>
@@ -733,18 +755,34 @@ export default function PluginsView() {
                   value={keywordsInput}
                   onChange={e => setKeywordsInput(e.target.value)}
                   placeholder="예: 파일,메모,백업 (비워두면 상시 가동)"
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleSaveEditPopup();
-                    if (e.key === 'Escape') { setIsEditModalOpen(false); setTargetPluginId(null); }
-                  }}
                   style={inputStyle}
                 />
               </div>
+
+              {/* ========================================================================= */}
+              {/* 💡 [신규 추가] 원격 타입이 아닐 때만(로컬/커스텀 스크립트) 워크스페이스 디렉토리 수정 인풋 활성화 */}
+              {/* ========================================================================= */}
+              {installedPlugins.find(p => p.id === targetPluginId)?.type !== 'remote' && (
+                <div style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
+                  <div style={labelStyle}>파일 작업 디렉토리(Workspace) 경로</div>
+                  <input
+                    type="text"
+                    value={pluginWorkspaceDir}
+                    onChange={e => setPluginWorkspaceDir(e.target.value)}
+                    placeholder="지정 폴더 절대 경로 (미입력 시 격리 세팅 유지)"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveEditPopup();
+                      if (e.key === 'Escape') { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }
+                    }}
+                    style={inputStyle}
+                  />
+                </div>
+              )}
               
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
                 <button
                   type="button"
-                  onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); }}
+                  onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); setPluginWorkspaceDir(''); }}
                   style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}
                 >취소</button>
                 <button
