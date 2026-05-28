@@ -39,7 +39,7 @@ export default function PluginsView() {
   const [statusMsg, setStatusMsg] = useState('');
   const [hoveredPluginId, setHoveredPluginId] = useState<string | null>(null);
 
-  // 💡 [신규] 원격 서버 플러그인들의 활성화 상태를 관리하는 상태 맵
+  // 원격 서버 플러그인들의 가동 상태 보관소
   const [onlineStates, setOnlineStates] = useState<Record<string, boolean>>({});
 
   // 모달 제어 상태 스위치
@@ -50,7 +50,7 @@ export default function PluginsView() {
   const [menuOpenPluginId, setMenuOpenPluginId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 폼 입력 관리 유닛 상태 (UI 바인딩용 스위치는 'local' 유지, 백엔드에는 'custom'으로 정제 전송)
+  // 폼 입력 관리 유닛 상태
   const [pluginType, setPluginType] = useState<'remote' | 'custom' | 'local'>('remote');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -66,14 +66,22 @@ export default function PluginsView() {
   // 수정 타겟팅 포인터
   const [targetPluginId, setTargetPluginId] = useState<string | null>(null);
 
-  // 💡 [신규] 원격 플러그인들의 헬스 상태를 비동기로 스캔하는 유틸리티
+  // 인터벌 클로저 버그 전면 차단용 레퍼런스 포인터
+  const pluginsRef = useRef<any[]>([]);
+  useEffect(() => {
+    pluginsRef.current = installedPlugins;
+  }, [installedPlugins]);
+
+  // 메인 프로세스의 헬스 캐시 데이터를 실시간으로 동기화하는 함수
   const checkRemotePluginsHealth = async (plugins: any[]) => {
-    const remotePlugins = plugins.filter(p => p.type === 'remote');
+    // 💡 [수정] 사용자에 의해 '활성화(enabled)'된 리모트 플러그인만 필터링하여 불필요한 네트워크 스캔 제거
+    const remotePlugins = plugins.filter(p => p.type === 'remote' && p.enabled);
+    if (remotePlugins.length === 0) return;
+    
     const results: Record<string, boolean> = {};
 
     await Promise.all(
       remotePlugins.map(async (p) => {
-        // 💡 url뿐만 아니라 플러그인 명세에 내장된 apiKey도 함께 추출하여 전달
         if (p.url && window.electronAPI.checkRemoteStatus) {
           const isOnline = await window.electronAPI.checkRemoteStatus({ 
             url: p.url, 
@@ -84,18 +92,29 @@ export default function PluginsView() {
       })
     );
 
-  setOnlineStates(prev => ({ ...prev, ...results }));
-};
+    setOnlineStates(prev => ({ ...prev, ...results }));
+  };
 
   const refreshPluginsList = async () => {
     const list = await window.electronAPI.getMcpPluginsList();
-    setInstalledPlugins(list || []);
-    if (list && list.length > 0) {
-      checkRemotePluginsHealth(list); // 목록 갱신 시 상태 스캔 가동
-    }
+    const cleanList = list || [];
+    setInstalledPlugins(cleanList);
+    checkRemotePluginsHealth(cleanList); 
   };
 
-  useEffect(() => { refreshPluginsList(); }, []);
+  // 실시간 15초 인터벌 동기화 가동
+  useEffect(() => {
+    refreshPluginsList();
+
+    const liveTracker = setInterval(() => {
+      const currentPlugins = pluginsRef.current;
+      if (currentPlugins && currentPlugins.length > 0) {
+        checkRemotePluginsHealth(currentPlugins);
+      }
+    }, 15000);
+
+    return () => clearInterval(liveTracker);
+  }, []);
 
   // 외부 클릭 감지 리스너
   useEffect(() => {
@@ -107,6 +126,31 @@ export default function PluginsView() {
     if (menuOpenPluginId) document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [menuOpenPluginId]);
+
+  // 💡 [신규] 토글 스위치 작동 시 핸들러 함수
+  const handleToggleEnable = async (pluginId: string, currentStatus: boolean) => {
+    if (!window.electronAPI.toggleMcpPlugin) return;
+    
+    const nextStatus = !currentStatus;
+    const res = await window.electronAPI.toggleMcpPlugin({ pluginId, enabled: nextStatus });
+    
+    if (res.success) {
+      // 로컬 스태이트 즉시 갱신
+      setInstalledPlugins(prev => 
+        prev.map(p => p.id === pluginId ? { ...p, enabled: nextStatus } : p)
+      );
+      // 리모트 플러그인을 꺼버린 경우 실시간 상태 불빛도 초기화
+      if (!nextStatus) {
+        setOnlineStates(prev => {
+          const updated = { ...prev };
+          delete updated[pluginId];
+          return updated;
+        });
+      }
+    } else {
+      alert(`상태 전환 실패: ${res.error}`);
+    }
+  };
 
   const handleSelectFile = async () => {
     try {
@@ -154,7 +198,7 @@ export default function PluginsView() {
       apiKey: targetPlugin.apiKey,
       workspaceDir: targetPlugin.workspaceDir,
       keywords: parsedKeywords,
-      enabled: true
+      enabled: targetPlugin.enabled // 기존 기조 유지
     };
 
     const res = await window.electronAPI.addMcpPlugin(updateConfig as any);
@@ -184,7 +228,7 @@ export default function PluginsView() {
       id: generatedId,
       name: name.trim(),
       keywords: parsedKeywords,
-      enabled: true
+      enabled: true // 최초 장착 시 활성화가 기본값
     };
 
     if (pluginType === 'remote') {
@@ -247,13 +291,14 @@ export default function PluginsView() {
 
   const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' };
 
-  const getBadgeTypeStyle = (type: string) => {
+  const getBadgeTypeStyle = (type: string, enabled: boolean) => {
     const isCustom = type === 'custom';
     return {
       fontSize: '0.68rem', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, textTransform: 'uppercase' as const,
       backgroundColor: isCustom ? 'rgba(217, 119, 6, 0.12)' : 'rgba(128, 128, 128, 0.12)',
       border: isCustom ? '1px solid rgba(217, 119, 6, 0.25)' : '1px solid rgba(128, 128, 128, 0.2)',
-      color: isCustom ? '#f59e0b' : 'var(--color-text-main)'
+      color: isCustom ? '#f59e0b' : 'var(--color-text-main)',
+      opacity: enabled ? 1 : 0.5
     };
   };
 
@@ -291,13 +336,14 @@ export default function PluginsView() {
               🔌 장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', width: '100%' }}>
               {installedPlugins.map((p) => {
                 const isRemote = p.type === 'remote';
                 const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
                 const hasWorkspace = p.workspaceDir && p.workspaceDir.trim().length > 0;
                 
-                // 💡 [신규] 원격 서버 플러그인용 상태 분석 유닛 추출
+                // 해당 플러그인이 켜져있는지 상태값 파싱 (기본값 true 처리)
+                const isEnabled = p.enabled !== false;
                 const isServerOnline = onlineStates[p.id] ?? false;
 
                 return (
@@ -310,20 +356,47 @@ export default function PluginsView() {
                       borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
                       gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
                       height: '135px', boxSizing: 'border-box',
-                      minWidth: 0 
+                      width: '100%', minWidth: 0,
+                      // 💡 비활성화 시 카드를 반투명 처리하여 시각적 직관성 확보
+                      opacity: isEnabled ? 1 : 0.52,
+                      transition: 'opacity 0.2s ease, transform 0.2s ease'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '65%' }}>
-                        <span style={{ color: 'var(--color-text-muted)', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '52%' }}>
+                        <span style={{ color: 'var(--color-text-muted)', opacity: isEnabled ? 0.8 : 0.4, display: 'flex', alignItems: 'center' }}>
                           {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
                         </span>
-                        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)' }}>{p.name}</span>
+                        <span style={{ 
+                          textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', 
+                          fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)',
+                          textDecoration: isEnabled ? 'none' : 'line-through', opacity: isEnabled ? 1 : 0.6
+                        }}>{p.name}</span>
                       </div>
                       
-                      {/* 💡 [수정] 타입 배지 왼쪽에 동적 헬스 체크 인디케이터 심기 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {isRemote && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        {/* 💡 [신규 추가] 미니 토글 슬라이더 스위치 UI 소켓 */}
+                        <div 
+                          onClick={() => handleToggleEnable(p.id, isEnabled)}
+                          style={{
+                            width: '28px', height: '16px', borderRadius: '999px',
+                            backgroundColor: isEnabled ? 'var(--color-text-main)' : 'rgba(128,128,128,0.2)',
+                            cursor: 'pointer', position: 'relative', transition: 'background-color 0.2s ease',
+                            border: '1px solid rgba(128,128,128,0.1)'
+                          }}
+                          title={isEnabled ? "플러그인 끄기" : "플러그인 켜기"}
+                        >
+                          <div style={{
+                            width: '12px', height: '12px', borderRadius: '50%',
+                            backgroundColor: isEnabled ? 'var(--color-btn-text)' : '#ffffff',
+                            position: 'absolute', top: '2px',
+                            left: isEnabled ? '14px' : '2px',
+                            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                          }} />
+                        </div>
+
+                        {isRemote && isEnabled && (
                           <div style={{ 
                             display: 'flex', 
                             alignItems: 'center', 
@@ -347,13 +420,12 @@ export default function PluginsView() {
                             {isServerOnline ? 'ONLINE' : 'OFFLINE'}
                           </div>
                         )}
-                        <span style={getBadgeTypeStyle(p.type)}>
+                        <span style={getBadgeTypeStyle(p.type, isEnabled)}>
                           {p.type}
                         </span>
                       </div>
                     </div>
 
-                    {/* 중간 내용 영역 명확히 미니멈 영역 확보 */}
                     <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {isRemote ? 'Endpoint Connection' : 'Local Workspace'}
@@ -370,7 +442,8 @@ export default function PluginsView() {
                             whiteSpace: 'nowrap', 
                             overflowX: 'auto', 
                             maxWidth: '100%',
-                            paddingBottom: '4px'
+                            paddingBottom: '4px',
+                            opacity: isEnabled ? 1 : 0.5
                           }} 
                           title={isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '지정되지 않음 (제한 없음)')}
                         >
@@ -380,8 +453,8 @@ export default function PluginsView() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
-                        {hasKeywords ? `🎯 키워드: ${p.keywords}` : '🔓 상시 대기조'}
+                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', opacity: isEnabled ? 1 : 0.5 }}>
+                        {isEnabled ? (hasKeywords ? `🎯 키워드: ${p.keywords}` : '🔓 상시 대기조') : '💤 비활성화됨'}
                       </div>
                     </div>
 
@@ -523,7 +596,6 @@ export default function PluginsView() {
                       </div>
                     )}
 
-                    {/* 체크박스를 토글하여 작업 공간 주입을 선택적으로 제어하는 유닛 블록 */}
                     <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>
                         <input 
@@ -538,7 +610,6 @@ export default function PluginsView() {
                         파일 작업 디렉토리(Workspace) 연동하기
                       </label>
 
-                      {/* 체크가 true 일 때만 필드 렌더링 활성화 */}
                       {useWorkspace && (
                         <div style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
                           <input 

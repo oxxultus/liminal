@@ -41,4 +41,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 💡 [신규 추가] 원격 서버 플러그인의 실시간 활성화 상태 체크 (Online/Offline 스캔용)
   // =========================================================================
   checkRemoteStatus: (payload: { url: string; apiKey: string }) => ipcRenderer.invoke('mcp:check-remote-status', payload),
+  // src/main/preload.ts 내부에 추가
+  toggleMcpPlugin: (payload: { pluginId: string; enabled: boolean }) => ipcRenderer.invoke('mcp:toggle-plugin', payload),
 });

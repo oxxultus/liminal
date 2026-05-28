@@ -15,6 +15,11 @@ let mainWindow: BrowserWindow | null = null;
 let db: any;
 let pluginManager: McpPluginManager;
 
+// =========================================================================
+// 💡 [Health Cache] 전역에서 관리할 리모트 플러그인 생사 상태 메모리 풀
+// =========================================================================
+export const globalOnlineStates: Record<string, boolean> = {};
+
 const isDev = process.env.NODE_ENV === 'development';
 const ENG_PATH = isDev
   ? path.join(app.getPath('temp'), 'engines.json')
@@ -58,7 +63,7 @@ async function prepareExternalPluginsEnv() {
       const defaultPkg = {
         name: 'liminal-external-plugins',
         version: '1.0.0',
-        type: 'module', // .mjs 및 ESM import/export 구조 완벽 대응
+        type: 'module',
         dependencies: {
           '@modelcontextprotocol/sdk': '^1.0.1'
         }
@@ -71,7 +76,6 @@ async function prepareExternalPluginsEnv() {
     if (!fs.existsSync(nodeModulesPath)) {
       console.log('⚙️ 외부 플러그인 전용 의존성 라이브러리 설치 중 (npm install)...');
       
-      // 비동기 백그라운드 설치로 앱 초기화 병목 방지
       execAsync('npm install', { cwd: pluginsDir })
         .then(() => console.log('✅ 외부 플러그인 독립 node_modules 설치 완료'))
         .catch((err) => console.error('❌ 외부 플러그인 의존성 구성 실패:', err));
@@ -81,18 +85,55 @@ async function prepareExternalPluginsEnv() {
   }
 }
 
+// =========================================================================
+// 💡 [Health Cache Scheduler] 60초 주기로 무선 연동 단추 생사 정보 캐싱 스케줄러
+// =========================================================================
+async function startHealthCheckScheduler() {
+  const checkAllRemotes = async () => {
+    try {
+      const remotePlugins = await db.all(
+        "SELECT id, url, apiKey FROM mcp_plugins WHERE type = 'remote' AND enabled = 1"
+      );
+      
+      await Promise.all(
+        remotePlugins.map(async (p: any) => {
+          try {
+            await axios.get(`${p.url}/api/v1/tools`, {
+              headers: { 'X-API-KEY': p.apiKey || '' },
+              timeout: 2000 // 핑 스캔이므로 타이트하게 2초 타임아웃 제한
+            });
+            globalOnlineStates[p.id] = true; // 🟢 가동 확인
+          } catch {
+            globalOnlineStates[p.id] = false; // 🔴 유실 확정
+          }
+        })
+      );
+      console.log('🎯 [Health Cache] 원격 플러그인 생사 스캔 최신화 통과:', globalOnlineStates);
+    } catch (e) {
+      console.error('Health Check 스케줄러 링 배치 오류:', e);
+    }
+  };
+
+  // 초기 로드 시점에 즉각 1회 검증 이후 1분마다 인터벌 순환
+  await checkAllRemotes();
+  setInterval(checkAllRemotes, 60000);
+}
+
 function registerIpcHandlers() {
   ipcMain.handle('mcp:get-tools', async () => await pluginManager.getAllToolsForLlm(''));
   ipcMain.handle('get-mcp-plugins-list', async () => await pluginManager.getPluginsConfigList());
 
   ipcMain.handle('remove-mcp-plugin', async (_, pluginId: string) => {
-    try { await pluginManager.removePlugin(pluginId); return { success: true }; }
+    try { 
+      await pluginManager.removePlugin(pluginId); 
+      // 캐시 맵에서도 찌꺼기가 남지 않게 제거
+      if (globalOnlineStates[pluginId] !== undefined) delete globalOnlineStates[pluginId];
+      return { success: true }; 
+    }
     catch (error: any) { return { success: false, error: error.message }; }
   });
 
-  // =========================================================================
   // 💡 [통합] 단일 창구로 진화한 플러그인 등록 가동 핸들러
-  // =========================================================================
   ipcMain.handle('mcp:add-plugin', async (_event, config) => {
     try {
       const pluginsDir = path.join(app.getPath('userData'), 'external_plugins');
@@ -103,19 +144,16 @@ function registerIpcHandlers() {
       if (config.type === 'custom' && targetFilePath) {
         const pluginId = config.id || `custom-${Date.now()}`;
         
-        // 💡 원본 파일의 확장자(.mjs 등)를 온전히 보존하여 모듈 해석 오류 차단
         const ext = path.extname(targetFilePath) || '.js';
         const filename = `${pluginId}${ext}`;
         const destinationPath = path.join(pluginsDir, filename);
 
-        // 분기 1: HTTP/HTTPS 다운로드 원격 스크립트 수급
         if (targetFilePath.startsWith('http://') || targetFilePath.startsWith('https://')) {
           console.log(`🌐 원격 스크립트 다운로드 덤프: ${targetFilePath}`);
           const response = await axios.get(targetFilePath, { responseType: 'text' });
           await fsPromises.writeFile(destinationPath, response.data, 'utf-8');
           targetFilePath = destinationPath;
         } 
-        // 분기 2: 로컬 디바이스 원본 스크립트 안전 구역 격리 복사
         else if (fs.existsSync(targetFilePath)) {
           console.log(`📂 로컬 스크립트 격리 복사: ${targetFilePath} -> ${destinationPath}`);
           await fsPromises.copyFile(targetFilePath, destinationPath);
@@ -123,7 +161,6 @@ function registerIpcHandlers() {
         }
       }
 
-      // 일관된 작업 디렉토리(CWD) 보정 알고리즘
       const resolvedWorkspaceDir = config.type === 'custom'
         ? (config.workspaceDir?.trim() || pluginsDir)
         : undefined;
@@ -168,9 +205,7 @@ function registerIpcHandlers() {
     catch (e: any) { return { success: false, error: e.message }; }
   });
 
-  // =========================================================================
-  // 💡 연쇄적 도구 호출(Multi-Tool Calling) 지원 무한 루프 프록시 엔진
-  // =========================================================================
+  // 연쇄적 도구 호출(Multi-Tool Calling) 지원 무한 루프 프록시 엔진
   ipcMain.handle('llm:chat-proxy', async (_, { engine, messages, apiKey }) => {
     try {
       let currentMessages = [...messages];
@@ -222,7 +257,6 @@ function registerIpcHandlers() {
         const rawData = await response.json();
         if (!response.ok) throw new Error(JSON.stringify(rawData));
 
-        // OpenAI 분기 핸들링
         if (engine.provider === 'openai') {
           const assistantMessage = rawData.choices[0].message;
 
@@ -249,7 +283,6 @@ function registerIpcHandlers() {
           continue;
         }
 
-        // Anthropic Claude 분기 핸들링
         if (engine.provider === 'anthropic') {
           const isToolUse = rawData.stop_reason === 'tool_use' || rawData.content?.some((b: any) => b.type === 'tool_use');
 
@@ -293,7 +326,6 @@ function registerIpcHandlers() {
           continue;
         }
 
-        // Google Gemini 분기 핸들링
         if (engine.provider === 'google') {
           const text = rawData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
           return { success: true, data: { text, rawMessage: { role: 'assistant', content: text } } };
@@ -376,19 +408,50 @@ function registerIpcHandlers() {
     });
   });
 
-  // src/main/main.ts - 관련 핸들러 수정
-    ipcMain.handle('mcp:check-remote-status', async (_, { url, apiKey }) => {
+  // 💡 [Health Cache 리팩토링] 프론트엔드 실시간 핑 요쳥 시 스케줄러가 보관한 캐시맵 즉시 조회 토스
+  ipcMain.handle('mcp:check-remote-status', async (_, { url, apiKey }) => {
     try {
-      const axios = require('axios'); // 상단 임포트가 이미 있다면 생략 가능
+      const row = await db.get("SELECT id FROM mcp_plugins WHERE url = ?", [url]);
+      if (row && globalOnlineStates[row.id] !== undefined) {
+        return globalOnlineStates[row.id];
+      }
       
-      // FastAPI 서버 보안 인터셉터를 정상 통과하도록 X-API-KEY 주입
+      // 혹시 명세 저장 전인 가상 임시 등록 단계 주소일 경우를 위한 폴백(Fallback) 일회성 동적 조회 유지
       await axios.get(`${url}/api/v1/tools`, { 
-        headers: { 'X-API-KEY': apiKey || '' },
-        timeout: 3000 // 상태 스캔용이므로 3초 타임아웃
+        headers: { 'X-API-KEY': apiKey || '' }, 
+        timeout: 2000 
       });
       return true;
     } catch (error) {
       return false;
+    }
+  });
+
+  // =========================================================================
+  // 🎯 [단일 조준 최적화 리팩토링] 전체 리로드를 방지하고 핀포인트 제어 가동
+  // =========================================================================
+  ipcMain.handle('mcp:toggle-plugin', async (_, { pluginId, enabled }) => {
+    try {
+      // 1. DB 상태 즉시 업데이트 (1 또는 0)
+      await db.run(
+        'UPDATE mcp_plugins SET enabled = ? WHERE id = ?',
+        [enabled ? 1 : 0, pluginId]
+      );
+
+      // 2. ❌ 무거운 loadPlugins() 전체 스캔을 도려내고 단일 모듈만 조준 타격 제어
+      if (pluginManager) {
+        await pluginManager.toggleSinglePlugin(pluginId, enabled);
+      }
+
+      // 3. 만약 원격 플러그인을 끈 거라면 전역 헬스 캐시 맵에서도 즉시 제거하여 청소
+      if (!enabled && globalOnlineStates[pluginId] !== undefined) {
+        delete globalOnlineStates[pluginId];
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('🚨 플러그인 토글 처리 실패:', error);
+      return { success: false, error: error.message };
     }
   });
 }
@@ -417,6 +480,10 @@ app.whenReady().then(async () => {
   
   pluginManager = new McpPluginManager(db);
   await pluginManager.loadPlugins();
+
+  // 모든 리모트 인프라 인스턴스 정보가 보관 완료된 직후 60초 백그라운드 스케줄러 가동
+  await startHealthCheckScheduler();
+
   registerIpcHandlers();
   createWindow();
 });

@@ -12,6 +12,8 @@ export interface IElectronAPI {
   // 💡 [신규 추가] 원격 서버 플러그인의 실시간 활성화 상태 체크 (Online/Offline 스캔용)
   // =========================================================================
   checkRemoteStatus: (payload: { url: string; apiKey: string }) => Promise<boolean>;
+  // src/renderer/global.d.ts 내부에 추가
+  toggleMcpPlugin: (payload: { pluginId: string; enabled: boolean }) => Promise<{ success: boolean; error?: string }>;
 
   // --- 엔진 관리 브릿지 ---
   getEngines: () => Promise<any[]>;

@@ -1,10 +1,12 @@
 // src/main/mcp/pluginManager.ts
 import * as path from 'path';
-import * as fs from 'fs'; // 💡 파일 유실 검증을 위한 fs 패키지 추가
+import * as fs from 'fs'; 
 import { McpPlugin, PluginConfig } from './types';
 import { RemoteHttpMcpPlugin } from '../plugins/remotePlugin';
 import { Database } from 'sqlite';
 import { StdioMcpPlugin } from '../plugins/stdioMcpPlugin';
+// 💡 [신규 추가] main.ts에 구축된 전역 상태 기반 헬스 캐시 데이터풀 연동
+import { globalOnlineStates } from '../main';
 
 export class McpPluginManager {
   private plugins: Map<string, McpPlugin> = new Map();
@@ -15,7 +17,7 @@ export class McpPluginManager {
   }
 
   // =========================================================================
-  // 💡 [안전 장치 추가] 앱 구동 시 실물 스크립트 파일 유실 여부 검증
+  // 💡 [안전 장치] 앱 구동 시 실물 스크립트 파일 유실 여부 검증
   // =========================================================================
   async loadPlugins(): Promise<void> {
     try {
@@ -28,7 +30,7 @@ export class McpPluginManager {
         if (config.type === 'custom' && config.url) {
           if (!fs.existsSync(config.url)) {
             console.warn(`⚠️ [플러그인 복원 무시] 물리 파일이 존재하지 않아 로드를 스킵합니다: ${config.name} (${config.url})`);
-            continue; // 파일이 없다면 자식 프로세스 생성을 시도하지 않고 안전하게 패스
+            continue; 
           }
         }
 
@@ -97,9 +99,7 @@ export class McpPluginManager {
     }));
   }
 
-  // src/main/mcp/pluginManager.ts 내부의 removePlugin 메서드 수정
   async removePlugin(pluginId: string): Promise<void> {
-    // 1. 메모리에서 구동 중인 자식 프로세스가 있다면 먼저 안전하게 종료
     const plugin = this.plugins.get(pluginId);
     if (plugin && typeof (plugin as StdioMcpPlugin).kill === 'function') {
       (plugin as StdioMcpPlugin).kill();
@@ -107,13 +107,11 @@ export class McpPluginManager {
     this.plugins.delete(pluginId);
 
     try {
-      // 2. 💡 [신규 추가] DB에서 지우기 전에 해당 플러그인의 물리 파일 경로(url)를 가져옵니다.
       const pluginConfig = await this.db.get(
         'SELECT type, url FROM mcp_plugins WHERE id = ?',
         [pluginId]
       );
 
-      // 3. 💡 [신규 추가] 'custom' 타입이고 스크립트 파일이 실제로 존재한다면 디스크에서 삭제
       if (pluginConfig && pluginConfig.type === 'custom' && pluginConfig.url) {
         if (fs.existsSync(pluginConfig.url)) {
           await fs.promises.unlink(pluginConfig.url);
@@ -121,11 +119,9 @@ export class McpPluginManager {
         }
       }
     } catch (fileError) {
-      // 혹시나 파일이 이미 지워졌거나 권한 문제로 실패해도 DB 삭제는 진행되도록 예외 처리
       console.error('⚠️ 플러그인 실물 파일 삭제 중 오류 발생:', fileError);
     }
 
-    // 4. 데이터베이스에서 레코드 최종 제거
     await this.db.run('DELETE FROM mcp_plugins WHERE id = ?', [pluginId]);
     console.log(`✅ 플러그인 레지스트리 제거 완료 (ID: ${pluginId})`);
   }
@@ -145,13 +141,11 @@ export class McpPluginManager {
       return plugin;
     }
 
-    // custom 타입 (과거 local 영역 포함)
     const scriptPath = config.url || (config as any).scriptPath;
     if (!scriptPath) {
       throw new Error(`스크립트 경로가 없습니다: ${config.name}`);
     }
 
-    // 💡 main.ts 통합 등록단에서 지정해준 격리된 workspaceDir 세팅값을 우선 적용합니다.
     const workspaceDir = config.workspaceDir?.trim() || path.dirname(scriptPath);
 
     const plugin = new StdioMcpPlugin(
@@ -176,6 +170,18 @@ export class McpPluginManager {
 
       const config = configs.find(c => c.id === plugin.id);
 
+      // =========================================================================
+      // 💡 [신규 추가] 배포 스펙 원천 오프라인 필터링 (Health Cache 검증)
+      // =========================================================================
+      if (config?.type === 'remote') {
+        const isOnline = globalOnlineStates[plugin.id];
+        // 캐시에 오프라인(false)으로 진단되어 있다면 listTools 통신 요청 없이 즉각 Skip
+        if (isOnline === false) {
+          console.log(`🎯 [Health Cache 컷] 원격 서버 단절 상태 감지 (Skip): ${plugin.name}`);
+          continue;
+        }
+      }
+
       const dbKeywords = config?.keywords || [];
       const scriptKeywords = (plugin as any).scriptKeywords || [];
       const finalKeywords = Array.from(new Set([...dbKeywords, ...scriptKeywords]));
@@ -197,7 +203,7 @@ export class McpPluginManager {
         continue;
       }
 
-      console.log(`🔥 [동적 필터] 포함: ${plugin.name}`);
+      console.log(`🔥 [동적 필터] 포함 및 도구 수급 요청: ${plugin.name}`);
       const tools = await plugin.listTools();
 
       for (const tool of tools) {
@@ -284,5 +290,48 @@ export class McpPluginManager {
     }
 
     return await plugin.callTool(fullToolName, args);
+  }
+  /**
+   * 💡 [신규 추가] 특정 플러그인 하나만 조준해서 메모리 상태를 토글 제어합니다.
+   */
+  async toggleSinglePlugin(pluginId: string, enabled: boolean): Promise<void> {
+    try {
+      // 1. 플러그인을 비활성화하는 경우 (메모리에서 해제 및 스레드 종료)
+      if (!enabled) {
+        const plugin = this.plugins.get(pluginId);
+        if (plugin) {
+          // Stdio 타입인 경우 가동 중인 자식 프로세스 안전 종료
+          if (typeof (plugin as any).kill === 'function') {
+            (plugin as any).kill();
+          }
+          this.plugins.delete(pluginId);
+          console.log(`🔌 [PluginManager] 플러그인 메모리 해제 완료: ${pluginId}`);
+        }
+        return;
+      }
+
+      // 2. 플러그인을 활성화하는 경우 (DB에서 해당 설정만 긁어와 메모리에 단독 주입)
+      const config = await this.db.get('SELECT * FROM mcp_plugins WHERE id = ?', [pluginId]);
+      if (!config) throw new Error('존재하지 않는 플러그인 레코드입니다.');
+
+      // 안전장치 검증 (스크립트 파일 유실 체크)
+      if (config.type === 'custom' && config.url && !fs.existsSync(config.url)) {
+        console.warn(`⚠️ [단독 활성화 실패] 물리 파일이 디스크에 없습니다: ${config.url}`);
+        return;
+      }
+
+      // 단독 초기화 유닛 가동
+      await this.initializePlugin({
+        ...config,
+        enabled: true,
+        // DB의 쉼표 문자열을 배열 구조체로 정제해서 전달
+        keywords: config.keywords ? config.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : []
+      });
+      console.log(`🚀 [PluginManager] 플러그인 단독 메모리 적재 성공: ${config.name}`);
+
+    } catch (error) {
+      console.error(`플러그인 단독 토글 프로세스 처리 중 오류:`, error);
+      throw error;
+    }
   }
 }
