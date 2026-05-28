@@ -1,6 +1,7 @@
 // src/renderer/components/SettingsView.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { EngineConfig } from '../App';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Icon = {
   Plus: () => (
@@ -27,6 +28,12 @@ const Icon = {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/>
     </svg>
+  ),
+  EmptySettings: () => (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-text-muted)', opacity: 0.5, marginBottom: '12px' }}>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
   )
 };
 
@@ -40,25 +47,20 @@ interface SettingsViewProps {
 export default function SettingsView({ engines = [], activeEngine, onEngineChange, onSave }: SettingsViewProps) {
   const [hoveredEngineId, setHoveredEngineId] = useState<string | null>(null);
 
-  // 모달 제어 상태 스위치
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // 더보기 컨텍스트 메뉴용 제어 상태
   const [menuOpenEngineId, setMenuOpenEngineId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 폼 입력 및 수정 버퍼 유닛 상태
   const [name, setName] = useState('');
   const [provider, setProvider] = useState<EngineConfig['provider']>('openai');
   const [url, setUrl] = useState('');
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
 
-  // 수정할 대상 엔진 타겟팅 포인터
   const [targetEngineId, setTargetEngineId] = useState<string | null>(null);
 
-  // 외부 영역 클릭 시 컨텍스트 메뉴 닫기 유틸리티
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -69,9 +71,8 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [menuOpenEngineId]);
 
-  // 더보기 메뉴 열기 제어
-  const handleOpenMenu = (e: React.MouseEvent, engineId: string) => {
-    e.stopPropagation();
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, engineId: string) => {
+    e.stopPropagation(); 
     if (menuOpenEngineId === engineId) {
       setMenuOpenEngineId(null);
     } else {
@@ -79,7 +80,6 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
     }
   };
 
-  // 엔진 등록 처리 함수
   const handleAddEngine = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !url || !model) return alert('필수 항목들을 기입해 주세요.');
@@ -90,7 +90,6 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
     resetForm();
   };
 
-  // 수정 팝업 진입 전처리 및 데이터 로드
   const handleStartEditModal = (eng: EngineConfig) => {
     setTargetEngineId(eng.id);
     setName(eng.name);
@@ -103,19 +102,17 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
     setMenuOpenEngineId(null);
   };
 
-  // 수정한 엔진 명세 업데이트 완료 함수
   const handleSaveEditPopup = async () => {
     if (!targetEngineId || !name.trim() || !url.trim() || !model.trim()) return;
 
     const updatedEngine: EngineConfig = { id: targetEngineId, name: name.trim(), provider, url: url.trim(), model: model.trim(), apiKey };
-    await window.electronAPI.addEngine(updatedEngine); // SQLite UPSERT 명세 연동
+    await window.electronAPI.addEngine(updatedEngine); 
     onSave();
     setIsEditModalOpen(false);
     setTargetEngineId(null);
     resetForm();
   };
 
-  // 엔진 삭제 처리
   const handleRemoveEngine = async (id: string, engineName: string) => {
     setMenuOpenEngineId(null);
     if (!confirm(`[${engineName}] LLM 코어 엔진 명세를 삭제하시겠습니까?`)) return;
@@ -128,43 +125,42 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
     setIsAddModalOpen(false);
   };
 
-  // 💡 [테마 변수 개조] 하드코딩된 라이트 색상을 CSS Variables 양식으로 일괄 이전
-  const glassCardStyle: React.CSSProperties = {
-    background: 'var(--bg-glass-card)',
-    backdropFilter: 'blur(30px)', 
-    WebkitBackdropFilter: 'blur(30px)',
-    padding: '28px', 
-    borderRadius: '16px', 
-    border: 'var(--border-glass)',
-    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.04)', 
-    boxSizing: 'border-box'
-  };
-
   const inputStyle: React.CSSProperties = {
-    width: '100%', 
-    padding: '10px 12px', 
-    borderRadius: '8px',
-    border: '1px solid var(--border-glass-input)',  // ← 수정
+    width: '100%', padding: '10px 12px', borderRadius: '8px',
+    border: '1px solid var(--border-glass-input)',
     backgroundColor: 'var(--bg-input)',
-    color: 'var(--color-text-main)', 
-    fontWeight: 500, 
-    fontSize: '0.9rem', 
-    outline: 'none',
-    marginTop: '6px', 
-    boxSizing: 'border-box'
+    color: 'var(--color-text-main)', fontWeight: 500, fontSize: '0.9rem', outline: 'none',
+    marginTop: '6px', boxSizing: 'border-box'
   };
 
   const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' };
 
-  // 각 Provider 명칭별 뱃지 스타일 맵핑 함수 (다크모드 시 색상 명도 최적화 스펙 반영)
-  const getProviderBadgeStyle = (prov: string) => {
+  // 💡 [디자인 통일] PluginsView의 배지 규격과 100% 매칭되는 미니멀 배지 스타일 딕셔너리
+  // 🟢 반환 타입을 React.CSSProperties로 명시하여 구조적 무결성 확보
+  const getProviderBadgeStyle = (prov: string): React.CSSProperties => {
     const isAnthropic = prov === 'anthropic';
     const isGoogle = prov === 'google';
+    
     return {
-      fontSize: '0.68rem', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, textTransform: 'uppercase' as const,
-      backgroundColor: isAnthropic ? 'rgba(217, 119, 6, 0.12)' : isGoogle ? 'rgba(0, 102, 204, 0.12)' : 'rgba(128, 128, 128, 0.12)',
-      border: isAnthropic ? '1px solid rgba(217, 119, 6, 0.25)' : isGoogle ? '1px solid rgba(0, 102, 204, 0.25)' : '1px solid rgba(128, 128, 128, 0.2)',
-      color: isAnthropic ? '#f59e0b' : isGoogle ? '#38bdf8' : 'var(--color-text-main)'
+      fontSize: '0.65rem',
+      padding: '2px 6px',
+      borderRadius: '5px',
+      fontWeight: 800,
+      textTransform: 'uppercase',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      lineHeight: '1',
+      height: '18px',
+      boxSizing: 'border-box', // 💡 이제 컴파일러가 단순 string이 아닌 'border-box' 고정 규격으로 완벽히 인지합니다.
+      letterSpacing: '0.02em',
+      color: '#fff',
+      backgroundColor: isAnthropic ? '#f59e0b' : isGoogle ? '#3b82f6' : '#10b981',
+      boxShadow: isAnthropic 
+        ? '0 2px 6px rgba(245,158,11,0.2)' 
+        : isGoogle 
+          ? '0 2px 6px rgba(59,130,246,0.2)' 
+          : '0 2px 6px rgba(16,185,129,0.2)'
     };
   };
 
@@ -176,7 +172,7 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '16px' }}>
           <div>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-text-main)', margin: 0, letterSpacing: '-0.02em' }}>Customize Setup</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>추가 연동을 위한 대형 언어 모델 명세 관리 및 기본 코어 구동 엔진 세팅</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>가동할 LLM 엔진 카드를 마우스로 클릭하여 즉시 활성화 상태로 지정하고 관리하세요.</p>
           </div>
           
           <button
@@ -184,147 +180,162 @@ export default function SettingsView({ engines = [], activeEngine, onEngineChang
             style={{
               display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px',
               background: 'var(--color-text-main)', color: 'var(--color-btn-text)', border: 'none', borderRadius: '10px',
-              fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.15s',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+              fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.15s'
             }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
             <Icon.Plus /> Add Engine
           </button>
         </div>
 
-        {/* 1. 활성화 코어 엔진 기본 선택 카드 */}
-        <section style={glassCardStyle}>
-          <h2 style={{ color: 'var(--color-text-main)', fontSize: '1.1rem', fontWeight: 800, marginTop: 0, marginBottom: '4px', letterSpacing: '-0.01em' }}>Core Engine Selection</h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '16px' }}>클라이언트 작업 공간의 메인 브레인 역할을 수행할 대표 인공지능을 정합니다.</p>
-          
-          {engines.length === 0 ? (
-            <div style={{ padding: '14px', backgroundColor: 'rgba(220, 38, 38, 0.08)', border: '1px solid rgba(220, 38, 38, 0.2)', color: '#dc2626', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 600 }}>
-              ⚠️ 등록된 LLM 엔진 명세가 전혀 없습니다! 우측 상단 Add Engine 버튼을 통해 최소 1개 이상 추가해야 워크스페이스가 가동됩니다.
-            </div>
-          ) : (
-            <select 
-              value={activeEngine?.id || ''} 
-              onChange={(e) => onEngineChange(e.target.value)} 
-              style={{ ...inputStyle, padding: '12px', border: 'var(--border-glass-input)', fontSize: '0.95rem' }}
-            >
-              {!activeEngine && <option value="" style={{ background: 'var(--bg-input)' }}>--- 가동할 코어 엔진을 선택해 주세요 ---</option>}
-              {engines.map(eng => (
-                <option key={eng.id} value={eng.id} style={{ background: 'var(--bg-input)', color: 'var(--color-text-main)' }}>
-                  {eng.name} — [{eng.provider.toUpperCase()} / {eng.model}]
-                </option>
-              ))}
-            </select>
-          )}
-        </section>
-
-        {/* 2. 등록된 AI 엔진 카드 리스트 그리드 세션 */}
-        <section style={{ marginTop: '8px' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '16px', color: 'var(--color-text-main)', marginTop: 0 }}>Registered Engine Specs ({engines.length})</h2>
-          
+        {/* 등록된 AI 엔진 카드 리스트 그리드 세션 */}
+        <section style={{ marginTop: '4px' }}>
           {engines.length === 0 ? (
             <div style={{ 
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem', fontWeight: 500,
               background: 'var(--bg-glass-card)', borderRadius: '16px', border: 'var(--border-glass)'
             }}>
-              ⚙️ 등록된 LLM 명세 파일이 없습니다. 우측 상단의 Add Engine 버튼을 눌러 연동 설정을 등록하세요.
+              <Icon.EmptySettings />
+              등록된 LLM 명세 파일이 없습니다. 우측 상단의 Add Engine 버튼을 눌러 연동 설정을 등록하세요.
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {engines.map((eng) => (
-                <div 
-                  key={eng.id}
-                  onMouseEnter={() => setHoveredEngineId(eng.id)}
-                  onMouseLeave={() => setHoveredEngineId(null)}
-                  style={{
-                    background: 'var(--bg-glass-card)', border: 'var(--border-glass)',
-                    borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
-                    gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
-                    height: '135px', boxSizing: 'border-box'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
-                      <span style={{ color: 'var(--color-text-muted)', opacity: 0.8, display: 'flex', alignItems: 'center' }}><Icon.Cpu /></span>
-                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)' }}>{eng.name}</span>
-                    </div>
-                    <span style={getProviderBadgeStyle(eng.provider)}>
-                      {eng.provider}
-                    </span>
-                  </div>
-
-                  <div style={{ flexGrow: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Model Spec Identifier</div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--color-text-main)', fontFamily: 'monospace', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {eng.model}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', fontFamily: 'monospace' }}>
-                      {eng.url}
-                    </div>
-                  </div>
-
-                  {(hoveredEngineId === eng.id || menuOpenEngineId === eng.id) && (
-                    <button
-                      onClick={(e) => handleOpenMenu(e, eng.id)}
+            <motion.div 
+              layout
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', width: '100%' }}
+            >
+              <AnimatePresence mode="popLayout">
+                {engines.map((eng) => {
+                  const isActive = activeEngine?.id === eng.id;
+                  
+                  return (
+                    <motion.div 
+                      key={eng.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 38 }}
+                      onMouseEnter={() => setHoveredEngineId(eng.id)}
+                      onMouseLeave={() => setHoveredEngineId(null)}
+                      onClick={() => onEngineChange(eng.id)}
                       style={{
-                        position: 'absolute', bottom: '12px', right: '14px',
-                        background: 'transparent', border: 'none',
-                        color: menuOpenEngineId === eng.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
-                        cursor: 'pointer', padding: '4px', borderRadius: '4px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10
+                        background: isActive ? 'rgba(16, 185, 129, 0.04)' : 'var(--bg-glass-card)', 
+                        border: isActive ? '1px solid #10b981' : 'var(--border-glass)',
+                        borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
+                        gap: '12px', 
+                        boxShadow: isActive ? '0 6px 20px rgba(16, 185, 129, 0.08)' : '0 4px 16px rgba(0,0,0,0.01)', 
+                        position: 'relative', height: '135px', boxSizing: 'border-box',
+                        width: '100%', minWidth: 0,
+                        cursor: 'pointer',
+                        transition: 'border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease'
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <Icon.More />
-                    </button>
-                  )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '65%', flexWrap: 'nowrap' }}>
+                          <span style={{ color: isActive ? '#10b981' : 'var(--color-text-muted)', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
+                            <Icon.Cpu />
+                          </span>
 
-                  {menuOpenEngineId === eng.id && (
-                    <div
-                      ref={menuRef}
-                      style={{
-                        position: 'absolute', bottom: '38px', right: '14px',
-                        backgroundColor: 'var(--bg-bubble-bot)', backdropFilter: 'blur(20px)',
-                        border: 'var(--border-glass)', borderRadius: '10px',
-                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)', padding: '4px', zIndex: 9999,
-                        display: 'flex', flexDirection: 'column', gap: '1px', width: '120px',
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => handleStartEditModal(eng)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
-                          border: 'none', background: 'transparent', borderRadius: '6px',
-                          fontSize: '0.78rem', fontWeight: 500, color: 'var(--color-text-main)', cursor: 'pointer',
-                          textAlign: 'left', width: '100%'
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
-                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                      >
-                        <Icon.Edit /> 엔진 정보 수정
-                      </button>
-                      <button
-                        onClick={() => handleRemoveEngine(eng.id, eng.name)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
-                          border: 'none', background: 'transparent', borderRadius: '6px',
-                          fontSize: '0.78rem', fontWeight: 500, color: '#ef4444', cursor: 'pointer',
-                          textAlign: 'left', width: '100%'
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                      >
-                        <Icon.Trash /> 삭제하기
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                          {/* 💡 [변경 1] ACTIVE 문자열 배지를 걷어내고, PluginsView와 일치하는 정밀 캡슐 그린닷(🟢) 연출 이식 */}
+                          {isActive && (
+                            <span style={{
+                              width: '6px', height: '6px', borderRadius: '50%',
+                              backgroundColor: '#10b981', flexShrink: 0,
+                              boxShadow: '0 0 6px #10b981'
+                            }} />
+                          )}
+
+                          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)' }}>
+                            {eng.name}
+                          </span>
+                        </div>
+                        
+                        {/* 💡 [변경 2] 우측 배지 공간은 순수하게 규격화된 Provider 정보만 우아하게 마킹 */}
+                        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                          <span style={getProviderBadgeStyle(eng.provider)}>
+                            {eng.provider}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Model Spec Identifier</div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--color-text-main)', fontFamily: 'monospace', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {eng.model}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', fontFamily: 'monospace' }}>
+                          {eng.url}
+                        </div>
+                      </div>
+
+                      {/* 더보기 버튼 */}
+                      {(hoveredEngineId === eng.id || menuOpenEngineId === eng.id) && (
+                        <button
+                          onClick={(e) => handleOpenMenu(e, eng.id)}
+                          style={{
+                            position: 'absolute', bottom: '12px', right: '14px',
+                            background: 'transparent', border: 'none',
+                            color: menuOpenEngineId === eng.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
+                            cursor: 'pointer', padding: '4px', borderRadius: '4px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          <Icon.More />
+                        </button>
+                      )}
+
+                      {menuOpenEngineId === eng.id && (
+                        <div
+                          ref={menuRef}
+                          style={{
+                            position: 'absolute', bottom: '38px', right: '14px',
+                            backgroundColor: 'var(--bg-bubble-bot)', backdropFilter: 'blur(20px)',
+                            border: 'var(--border-glass)', borderRadius: '10px',
+                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)', padding: '4px', zIndex: 9999,
+                            display: 'flex', flexDirection: 'column', gap: '1px', width: '120px',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => handleStartEditModal(eng)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+                              border: 'none', background: 'transparent', borderRadius: '6px',
+                              fontSize: '0.78rem', fontWeight: 500, color: 'var(--color-text-main)', cursor: 'pointer',
+                              textAlign: 'left', width: '100%'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          >
+                            <Icon.Edit /> 엔진 정보 수정
+                          </button>
+                          <button
+                            onClick={() => handleRemoveEngine(eng.id, eng.name)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+                              border: 'none', background: 'transparent', borderRadius: '6px',
+                              fontSize: '0.78rem', fontWeight: 500, color: '#ef4444', cursor: 'pointer',
+                              textAlign: 'left', width: '100%'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <Icon.Trash /> 삭제하기
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
           )}
         </section>
 

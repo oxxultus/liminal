@@ -1,5 +1,6 @@
 // src/renderer/components/PluginsView.tsx
 import React, { useState, useEffect, useRef } from 'react';
+// 자연스러운 레이아웃 전환 애니메이션을 위한 framer-motion 임포트
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Icon = {
@@ -48,11 +49,6 @@ const Icon = {
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
     </svg>
   ),
-  Sleep: () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: '5px', verticalAlign: 'middle' }}>
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
-  ),
   Tag: () => (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: '5px', verticalAlign: 'middle' }}>
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
@@ -64,7 +60,6 @@ export default function PluginsView() {
   const [installedPlugins, setInstalledPlugins] = useState<any[]>([]);
   const [statusMsg, setStatusMsg] = useState('');
   const [hoveredPluginId, setHoveredPluginId] = useState<string | null>(null);
-
   const [onlineStates, setOnlineStates] = useState<Record<string, boolean>>({});
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -96,7 +91,6 @@ export default function PluginsView() {
     if (remotePlugins.length === 0) return;
     
     const results: Record<string, boolean> = {};
-
     await Promise.all(
       remotePlugins.map(async (p) => {
         if (p.url && window.electronAPI.checkRemoteStatus) {
@@ -108,7 +102,6 @@ export default function PluginsView() {
         }
       })
     );
-
     setOnlineStates(prev => ({ ...prev, ...results }));
   };
 
@@ -128,14 +121,12 @@ export default function PluginsView() {
 
   useEffect(() => {
     refreshPluginsList();
-
     const liveTracker = setInterval(() => {
       const currentPlugins = pluginsRef.current;
       if (currentPlugins && currentPlugins.length > 0) {
         checkRemotePluginsHealth(currentPlugins);
       }
     }, 15000);
-
     return () => clearInterval(liveTracker);
   }, []);
 
@@ -191,7 +182,7 @@ export default function PluginsView() {
     } catch (err: any) { alert(`파일 선택 실패: ${err.message}`); }
   };
 
-  const handleOpenMenu = (e: React.MouseEvent, pluginId: string) => {
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, pluginId: string) => {
     e.stopPropagation();
     if (menuOpenPluginId === pluginId) {
       setMenuOpenPluginId(null);
@@ -200,7 +191,6 @@ export default function PluginsView() {
     }
   };
 
-  // 💡 [수정] 수정 모달 진입 시 기존에 기입되어 있던 워크스페이스 명세까지 인풋 폼에 바인딩
   const handleStartEditModal = (plugin: any) => {
     setTargetPluginId(plugin.id);
     setName(plugin.name);
@@ -209,8 +199,6 @@ export default function PluginsView() {
       ? plugin.keywords.join(',') 
       : String(plugin.keywords || '');
     setKeywordsInput(keywordsStr);
-    
-    // 워크스페이스 복원 기입
     setPluginWorkspaceDir(plugin.workspaceDir || '');
     
     setIsEditModalOpen(true);
@@ -234,7 +222,6 @@ export default function PluginsView() {
       url: targetPlugin.url || targetPlugin.scriptPath,
       apiKey: targetPlugin.apiKey,
       version: targetPlugin.version,
-      // 💡 [수정] 수정된 워크스페이스 경로 주입
       workspaceDir: pluginWorkspaceDir.trim() || undefined,
       keywords: parsedKeywords,
       enabled: targetPlugin.enabled 
@@ -322,6 +309,21 @@ export default function PluginsView() {
     if (res.success) refreshPluginsList();
   };
 
+  const baseBadgeStyle: React.CSSProperties = {
+    fontSize: '0.65rem',
+    padding: '2px 6px',
+    borderRadius: '5px',
+    fontWeight: 800,
+    textTransform: 'uppercase' as const,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: '1',
+    height: '18px',
+    boxSizing: 'border-box',
+    letterSpacing: '0.02em'
+  };
+
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 12px', borderRadius: '8px',
     border: '1px solid var(--border-glass-input)',
@@ -329,21 +331,27 @@ export default function PluginsView() {
     marginTop: '6px', boxSizing: 'border-box'
   };
 
-  const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' };
-
-  const getBadgeTypeStyle = (type: string, enabled: boolean) => {
-    const isCustom = type === 'custom';
-    return {
-      fontSize: '0.68rem', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, textTransform: 'uppercase' as const,
-      backgroundColor: isCustom ? 'rgba(217, 119, 6, 0.12)' : 'rgba(128, 128, 128, 0.12)',
-      border: isCustom ? '1px solid rgba(217, 119, 6, 0.25)' : '1px solid rgba(128, 128, 128, 0.2)',
-      color: isCustom ? '#f59e0b' : 'var(--color-text-main)',
-      opacity: enabled ? 1 : 0.5
-    };
+  const getBorderColor = (p: any, isEnabled: boolean, isServerOnline: boolean) => {
+    if (!isEnabled) return 'var(--border-glass)'; // 비활성화는 기본 테두리
+    if (p.type === 'remote') {
+      return isServerOnline ? '#3b82f6' : '#ef4444'; // 연결 성공(Blue) / 유실(Red)
+    }
+    return '#f59e0b'; // Custom은 항상 오렌지색 테두리
   };
+
+  const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' };
 
   return (
     <div style={{ width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'transparent', boxSizing: 'border-box' }}>
+      {/* 💡 [네트워크 펄스 전용] 파란색 연결 인디케이터용 키프레임 정의 */}
+      <style>{`
+        @keyframes mcp-network-pulse {
+          0% { transform: scale(0.95); opacity: 0.5; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
+          50% { transform: scale(1.05); opacity: 1; box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.4); }
+          100% { transform: scale(0.95); opacity: 0.5; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+      `}</style>
+
       <div style={{ maxWidth: '840px', margin: '0 auto', padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: '24px', boxSizing: 'border-box' }}>
         
         {/* 대시보드 상단 바 */}
@@ -396,7 +404,7 @@ export default function PluginsView() {
                       key={p.id}
                       layout
                       initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: isEnabled ? 1 : 0.52, scale: 1 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ 
                         type: 'spring', 
@@ -406,93 +414,91 @@ export default function PluginsView() {
                       }}
                       onMouseEnter={() => setHoveredPluginId(p.id)}
                       onMouseLeave={() => setHoveredPluginId(null)}
+                      onClick={() => handleToggleEnable(p.id, isEnabled)}
                       style={{
-                        background: 'var(--bg-glass-card)', border: 'var(--border-glass)',
+                        background: isEnabled ? (p.type === 'remote' ? (isServerOnline ? 'rgba(59, 130, 246, 0.04)' : 'rgba(239, 68, 68, 0.04)') : 'rgba(245, 158, 11, 0.04)') : 'var(--bg-glass-card)', 
+                        border: `1px solid ${getBorderColor(p, isEnabled, isServerOnline)}`,
                         borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
-                        gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
+                        gap: '12px', 
+                        boxShadow: isEnabled ? '0 6px 20px rgba(16, 185, 129, 0.08)' : '0 4px 16px rgba(0,0,0,0.01)',
+                        position: 'relative',
                         height: '135px', boxSizing: 'border-box',
                         width: '100%', minWidth: 0,
-                        transition: 'box-shadow 0.2s ease'
+                        cursor: 'pointer',
+                        opacity: isEnabled ? 1 : 0.52,
+                        transition: 'border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, opacity 0.2s ease'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '58%' }}>
-                          <span style={{ color: 'var(--color-text-muted)', opacity: isEnabled ? 0.8 : 0.4, display: 'flex', alignItems: 'center' }}>
+                        {/* 왼쪽 명세 정보 레이아웃 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '60%', flexWrap: 'nowrap' }}>
+                          
+                          <span style={{ 
+                            color: isRemote 
+                              ? (isServerOnline && isEnabled ? '#10b981' : 'var(--color-text-muted)') 
+                              : (isEnabled ? 'var(--color-text-main)' : 'var(--color-text-muted)'), 
+                            opacity: isEnabled ? 1 : 0.4, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            flexShrink: 0 
+                          }}>
                             {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
                           </span>
+
+                          {/* 🟢 [활성화 고정 불빛] 플러그인이 켜지면 상시 대기중임을 알리는 심플 고정 그린 라이트 */}
+                          {isEnabled && (
+                            <span style={{
+                              width: '6px', height: '6px', borderRadius: '50%',
+                              backgroundColor: '#10b981', flexShrink: 0,
+                              boxShadow: '0 0 5px #10b981'
+                            }} />
+                          )}
+
+                          {/* 🔵🔴 [네트워크 연결 단독 지표] 원격 서버 타겟일 때만 가동되는 파란색/회색 듀얼 실시간 검증 라이트 */}
+                          {isRemote && isEnabled && (
+                            <span style={{
+                              width: '6px', height: '6px', borderRadius: '50%',
+                              backgroundColor: isServerOnline ? '#3b82f6' : '#ef4444',
+                              flexShrink: 0,
+                              // 연결 상태에 따라 애니메이션 클래스 제어
+                              animation: isServerOnline ? 'mcp-network-pulse 1.5s infinite' : 'mcp-error-blink 1s infinite',
+                              boxShadow: isServerOnline ? '0 0 5px #3b82f6' : '0 0 5px #ef4444'
+                            }} />
+                          )}
+
                           <span style={{ 
                             textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', 
                             fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)',
                             opacity: isEnabled ? 1 : 0.6
                           }}>{p.name}</span>
-
-                          <span style={{
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            fontFamily: 'monospace',
-                            color: 'var(--color-text-muted)',
-                            backgroundColor: 'rgba(128, 128, 128, 0.08)',
-                            padding: '2px 5px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(128, 128, 128, 0.12)',
-                            flexShrink: 0,
-                            opacity: isEnabled ? 0.85 : 0.4
-                          }}>
-                            v{p.version || '1.0.0'}
-                          </span>
                         </div>
                         
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, position: 'relative' }}>
-                          {isRemote && isEnabled && (
-                            <div style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '4px',
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              color: isServerOnline ? '#10b981' : '#6e6e7a',
-                              backgroundColor: isServerOnline ? 'rgba(16, 185, 129, 0.08)' : 'rgba(110, 110, 122, 0.08)',
-                              padding: '3px 6px',
-                              borderRadius: '5px',
-                              border: isServerOnline ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(110, 110, 122, 0.15)'
-                            }}>
-                              <span style={{ 
-                                width: '5px', 
-                                height: '5px', 
-                                borderRadius: '50%', 
-                                backgroundColor: isServerOnline ? '#10b981' : '#6e6e7a',
-                                display: 'inline-block',
-                                boxShadow: isServerOnline ? '0 0 6px #10b981' : 'none'
-                              }} />
-                              {isServerOnline ? 'ONLINE' : 'OFFLINE'}
-                            </div>
-                          )}
-                          <span style={getBadgeTypeStyle(p.type, isEnabled)}>
+                        {/* 우측 상단 순수 명세 배지 집합소 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                          {/* TYPE 배지 */}
+                          <span style={{
+                            ...baseBadgeStyle,
+                            color: '#fff',
+                            backgroundColor: p.type === 'custom' ? '#f59e0b' : (p.type === 'remote' ? '#3b82f6' : '#6b7280'),
+                            boxShadow: isEnabled 
+                              ? (p.type === 'custom' ? '0 2px 6px rgba(245,158,11,0.2)' : '0 2px 6px rgba(59,130,246,0.2)') 
+                              : 'none',
+                            opacity: isEnabled ? 1 : 0.5
+                          }}>
                             {p.type}
                           </span>
 
-                          <div 
-                            onClick={() => handleToggleEnable(p.id, isEnabled)}
-                            style={{
-                              width: '28px', height: '16px', borderRadius: '999px',
-                              backgroundColor: isEnabled ? '#10b981' : 'rgba(128,128,128,0.2)',
-                              cursor: 'pointer', position: 'relative', transition: 'background-color 0.2s ease',
-                              border: '1px solid rgba(128,128,128,0.1)',
-                              display: 'flex', alignItems: 'center', marginLeft: '2px'
-                            }}
-                            title={isEnabled ? "플러그인 비활성화" : "플러그인 활성화"}
-                          >
-                            <div style={{
-                              width: '12px', height: '12px', borderRadius: '50%',
-                              backgroundColor: '#ffffff',
-                              position: 'absolute',
-                              top: '50%',
-                              transform: 'translateY(-50%)', 
-                              left: isEnabled ? '13px' : '1px',
-                              transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
-                            }} />
-                          </div>
+                          {/* VERSION 배지 */}
+                          <span style={{
+                            ...baseBadgeStyle,
+                            fontFamily: 'monospace',
+                            color: 'var(--color-text-muted)',
+                            backgroundColor: 'rgba(128, 128, 128, 0.06)',
+                            border: '1px solid rgba(128, 128, 128, 0.15)',
+                            opacity: isEnabled ? 1 : 0.4
+                          }}>
+                            v{p.version || '1.0.0'}
+                          </span>
                         </div>
                       </div>
 
@@ -524,11 +530,7 @@ export default function PluginsView() {
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
                         <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', opacity: isEnabled ? 1 : 0.5 }}>
-                          {isEnabled ? (
-                            hasKeywords ? <><Icon.Tag />키워드: {p.keywords}</> : <><Icon.Activity />상시 대기조</>
-                          ) : (
-                            <><Icon.Sleep />비활성화됨</>
-                          )}
+                          {hasKeywords ? <><Icon.Tag />키워드: {p.keywords}</> : <><Icon.Activity />상시 대기조</>}
                         </div>
                       </div>
 
@@ -564,7 +566,6 @@ export default function PluginsView() {
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {/* 💡 [수정] 인자 규격을 p(단일 객체) 형태로 우아하게 위임 유도 */}
                           <button
                             onClick={() => handleStartEditModal(p)}
                             style={{
@@ -658,11 +659,10 @@ export default function PluginsView() {
                     {pluginType === 'custom' ? (
                       <div>
                         <div style={labelStyle}>Plugin Download URL</div>
-                        <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../tool.js" required style={inputStyle} />
+                        <input type="url" value={downloadUrl} onChange={e => setUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../tool.js" required style={inputStyle} />
                       </div>
                     ) : (
                       <div>
-                        <div style={labelStyle}>JavaScript File Path</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                           <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
                           <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(128,128,128,0.1)', border: '1px solid rgba(128,128,128,0.15)', color: 'var(--color-text-main)', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
@@ -717,7 +717,7 @@ export default function PluginsView() {
           </div>
         )}
 
-        {/* 플러그인 별칭 및 키워드 동시 수정 모달 팝업 레이어 */}
+        {/* 플러그인 정보 수정 모달 팝업 */}
         {isEditModalOpen && (
           <div style={{
             position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
@@ -737,7 +737,7 @@ export default function PluginsView() {
               </div>
 
               <div>
-                <div style={labelStyle}>Plugin Alias</div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Plugin Alias</div>
                 <input
                   type="text"
                   value={name}
@@ -749,7 +749,7 @@ export default function PluginsView() {
               </div>
 
               <div>
-                <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Trigger Keywords (쉼표 구분)</div>
                 <input
                   type="text"
                   value={keywordsInput}
@@ -759,12 +759,9 @@ export default function PluginsView() {
                 />
               </div>
 
-              {/* ========================================================================= */}
-              {/* 💡 [신규 추가] 원격 타입이 아닐 때만(로컬/커스텀 스크립트) 워크스페이스 디렉토리 수정 인풋 활성화 */}
-              {/* ========================================================================= */}
               {installedPlugins.find(p => p.id === targetPluginId)?.type !== 'remote' && (
                 <div style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
-                  <div style={labelStyle}>파일 작업 디렉토리(Workspace) 경로</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>파일 작업 디렉토리(Workspace) 경로</div>
                   <input
                     type="text"
                     value={pluginWorkspaceDir}
