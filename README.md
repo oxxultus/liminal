@@ -111,15 +111,15 @@ API Key:   sk-...
 
 ## 플러그인 작성 가이드
 
-Liminal Desktop의 로컬형 플러그인은 공식 `@modelcontextprotocol/sdk` 모듈 및 `zod`를 활용하여 작성할 수 있는 Node.js 자바스크립트 스크립트 파일(`*.mjs`)입니다. 시스템과 플러그인은 표준 입출력(Stdio `stdin`/`stdout`) 채널을 통해 비동기 JSON-RPC 2.0 프로토콜 방식으로 통신합니다.
+Liminal Desktop의 로컬형 플러그인은 공식 `@modelcontextprotocol/sdk` 모듈 및 `zod`를 활용하여 작성할 수 있는 Node.js 자바스크립트 스크립트 파일(`.mjs`, `.js`)입니다. 시스템과 플러그인은 표준 입출력(Stdio `stdin`/`stdout`) 채널을 통해 비동기 JSON-RPC 2.0 프로토콜 방식으로 통신합니다.
 
 ### 플러그인 유형
 
 | 유형 | 설명 | 작업 공간(`workspaceDir`) 요구 여부 |
 | --- | --- | --- |
-| `remote` | HTTP 엔드포인트로 외부 서버(FastAPI 등)에 연결 | ❌ 불필요 |
-| `custom` | URL에서 `.mjs` 스크립트를 다운로드하여 실행 | ⚠️ 선택적 주입 (`useWorkspace` 토글) |
-| `custom` | 로컬 환경의 `.mjs` 파일을 시스템에 직접 연결 | ⚠️ 선택적 주입 (`useWorkspace` 토글) |
+| `remote` | HTTP 엔드포인트로 외부 서버(FastAPI 등)에 연결 | 불필요 |
+| `custom` | URL에서 `.mjs`, `.js` 스크립트를 다운로드하여 실행 | 선택적 주입 (`useWorkspace` 토글) |
+| `custom` | 로컬 환경의 `.mjs`, `.js` 파일을 시스템에 직접 연결 | 선택적 주입 (`useWorkspace` 토글) |
 
 ---
 
@@ -141,21 +141,21 @@ const server = new McpServer({
   version: '1.0.0'
 });
 
-// 💡 시스템(StdioMcpPlugin)이 선택적으로 주입한 환경변수 바인딩
+// 시스템(StdioMcpPlugin)이 선택적으로 주입한 환경변수 바인딩
 const workspaceDir = process.env.WORKSPACE_DIR ? path.resolve(process.env.WORKSPACE_DIR) : null;
 
 // ====================== 2. 고유 키워드 정의 ======================
-// 💡 메인 앱의 동적 문맥 필터링 스위치로 사용될 고유 키워드 리스트
+// 메인 앱의 동적 문맥 필터링 스위치로 사용될 고유 키워드 리스트
 const keywords = ['파일', '메모', '저장', 'file', 'memo', 'save', 'txt'];
 
 // Safe Path Helper: 샌드박스(Directory Traversal) 방어
 const resolveSafePath = (filename) => {
   if (!workspaceDir) {
-    throw new Error('❌ 이 도구를 실행하려면 플러그인 설정에서 Workspace 경로를 연동해야 합니다.');
+    throw new Error('이 도구를 실행하려면 플러그인 설정에서 Workspace 경로를 연동해야 합니다.');
   }
   const fullPath = path.resolve(workspaceDir, filename);
   if (!fullPath.startsWith(workspaceDir)) {
-    throw new Error('❌ 보안 오류: 작업 공간 외부 경로에는 접근할 수 없습니다.');
+    throw new Error('보안 오류: 작업 공간 외부 경로에는 접근할 수 없습니다.');
   }
   return fullPath;
 };
@@ -178,7 +178,7 @@ server.tool(
       return {
         content: [{
           type: 'text',
-          text: `✅ 파일 작성 완료: ${filename}`
+          text: `파일 작성 완료: ${filename}`
         }]
       };
     } catch (error) {
@@ -189,7 +189,7 @@ server.tool(
   }
 );
 
-// ====================== 💡 4. 핵심: 독자 규격 키워드 인터셉터 바인딩 ======================
+// ====================== 4. 핵심: 독자 규격 키워드 인터셉터 바인딩 ======================
 // 공식 SDK 호환성을 깨지 않으면서, 메인 앱의 getAllToolsForLlm 필터링 메커니즘과 연동하는 핵심 허브
 const originalWrite = process.stdout.write.bind(process.stdout);
 process.stdout.write = (chunk, encoding, callback) => {
@@ -272,7 +272,7 @@ Keywords 미선언       →  상시 활성화 상태로 대기 (모든 대화 �
 
 1. **MCP Ecosystem** 대시보드 우측 상단 **Add Plugin** 버튼을 클릭합니다.
 2. **Plugin Type**에서 `Local Script File`을 선택합니다.
-3. 작성한 파일이 자바스크립트 표준 모듈 형식을 따르도록 확장자를 `*.mjs`로 변경한 뒤, **파일 탐색** 버튼을 통해 경로를 지정합니다.
+3. 작성한 파일이 자바스크립트 표준 모듈 형식을 따르도록 확장자를 `*.js`,`*.mjs`로 변경한 뒤, **파일 탐색** 버튼을 통해 경로를 지정합니다.
 4. 해당 툴이 로컬 파일 저장 및 가공 역할을 수행한다면 **'파일 작업 디렉토리(Workspace) 연동하기'** 체크박스를 활성화하고 경로를 주입합니다. 단순 조회/원격 연동용 툴이라면 체크박스를 비활성화합니다.
 5. 트리거 컨텍스트 단어(쉼표로 구분)를 입력합니다. (비워둘 시 전체 문맥 상시 활성화)
 6. **Link & Activate** 버튼을 클릭하여 적용합니다.
@@ -281,7 +281,7 @@ Keywords 미선언       →  상시 활성화 상태로 대기 (모든 대화 �
 
 ### 작성 체크리스트
 
-* [ ] 구현된 스크립트 확장자가 명확히 ES Module 사양의 `*.mjs` 형식으로 지정되어 있는가
+* [ ] 구현된 스크립트 확장자가 명확히 ES Module 사양의 `*.js`,`*.mjs` 형식으로 지정되어 있는가
 * [ ] 공식 `@modelcontextprotocol/sdk` 규격 모듈과 `zod` 체인이 정상 연동되어 있는가
 * [ ] 메인 클라이언트 앱의 필터 체인 연동을 위한 stdout 인터셉터 코드와 플러그인 전용 `keywords` 맵이 제대로 바인딩되어 있는가
 * [ ] 파일 트래버설 공격 방어(`startsWith`) 및 주입되지 않은 `WORKSPACE_DIR` 상태 분기 예외 설계가 되어 있는가
