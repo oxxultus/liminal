@@ -840,7 +840,7 @@ export default function ChatView({ engines, activeEngine, onProviderChange, sess
                 {toast.type === 'plugins_report' && toast.pluginList && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                     <div style={{ fontWeight: 800, fontSize: '0.88rem', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '6px', marginBottom: '4px' }}>
-                      MCP Ecosystem Registry ({toast.pluginList.length})
+                      MCP 플러그인 리스트 ({toast.pluginList.length})
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
                       {toast.pluginList.map((p: any, idx: number) => {

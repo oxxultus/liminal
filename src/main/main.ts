@@ -225,166 +225,94 @@ function registerIpcHandlers() {
       }
 
       while (true) {
-        let body: any = { model: engine.model };
+        // 💡 [핵심 방어 1] 전송 직전 메시지 검증: 빈 content를 가진 메시지는 API 거부 사유가 됨
+        currentMessages = currentMessages.filter((m: any) => {
+          if (Array.isArray(m.content)) return m.content.length > 0;
+          return m.content && String(m.content).trim().length > 0;
+        });
 
+        let body: any = { model: engine.model };
         const lastMessage = currentMessages[currentMessages.length - 1];
         let textPrompt = '';
         
-        if (lastMessage && lastMessage.content) {
-          if (Array.isArray(lastMessage.content)) {
-            textPrompt = lastMessage.content
-              .filter((c: any) => c.type === 'text')
-              .map((c: any) => c.text || '')
-              .join(' ');
-          } else {
-            textPrompt = String(lastMessage.content);
-          }
+        if (lastMessage?.content) {
+          textPrompt = Array.isArray(lastMessage.content) 
+            ? lastMessage.content.filter((c: any) => c.type === 'text').map((c: any) => c.text || '').join(' ')
+            : String(lastMessage.content);
         }
 
         const dynamicTools = await pluginManager.getAllToolsForLlm(textPrompt);
 
+        // 프로바이더별 body 조립 (OpenAI, Anthropic, Google)
         if (engine.provider === 'openai') {
-          body.messages = currentMessages.map((m: any) => {
-            if (Array.isArray(m.content)) {
-              return {
-                role: m.role,
-                content: m.content.filter((c: any) => c.type === 'text' || c.type === 'image_url')
-              };
-            }
-            return m;
-          });
-          if (dynamicTools && dynamicTools.length > 0) body.tools = dynamicTools;
-          
+          body.messages = currentMessages.map((m: any) => ({
+            role: m.role,
+            content: Array.isArray(m.content) 
+              ? m.content.filter((c: any) => c.type === 'text' || c.type === 'image_url')
+              : m.content
+          }));
+          if (dynamicTools?.length > 0) body.tools = dynamicTools;
         } else if (engine.provider === 'anthropic') {
-          body.messages = currentMessages.map((m: any) => {
-            if (Array.isArray(m.content)) {
-              const processedContent: any[] = [];
-              
-              m.content.forEach((c: any) => {
-                if (c.type === 'text') {
-                  processedContent.push(c);
-                } else if (c.type === 'image_url' && c.image_url?.url?.includes('base64,')) {
-                  const [meta, base64Data] = c.image_url.url.split('base64,');
-                  const mediaType = meta.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
-                  processedContent.push({
-                    type: 'image',
-                    source: { type: 'base64', media_type: mediaType, data: base64Data }
-                  });
-                } else if (c.type === 'pdf_file' && c.base64Data) {
-                  const rawBase64 = c.base64Data.includes('base64,') ? c.base64Data.split('base64,')[1] : c.base64Data;
-                  processedContent.push({
-                    type: 'document',
-                    source: { type: 'base64', media_type: 'application/pdf', data: rawBase64 }
-                  });
-                }
-              });
-              
-              return { role: m.role, content: processedContent };
-            }
-            return m;
-          });
-          
-          body.max_tokens = 2048;
-          if (dynamicTools && dynamicTools.length > 0) {
-            body.tools = dynamicTools.map((t: any) => ({
-              name: t.name,
-              description: t.description,
-              input_schema: t.input_schema
-            }));
-          }
-          
+          body.messages = currentMessages.map((m: any) => ({
+            role: m.role,
+            content: Array.isArray(m.content) ? m.content.map((c: any) => {
+              if (c.type === 'text') return c;
+              if (c.type === 'image_url') {
+                const [meta, data] = c.image_url.url.split('base64,');
+                return { type: 'image', source: { type: 'base64', media_type: meta.match(/data:([^;]+);/)?.[1] || 'image/jpeg', data } };
+              }
+              if (c.type === 'pdf_file') return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: c.base64Data.split('base64,')[1] || c.base64Data } };
+              return c;
+            }) : m.content
+          }));
+          body.max_tokens = 4096;
+          if (dynamicTools?.length > 0) body.tools = dynamicTools.map((t: any) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
         } else if (engine.provider === 'google') {
-          body.contents = currentMessages.map((m: any) => {
-            let parts: any[] = [];
-            if (Array.isArray(m.content)) {
-              m.content.forEach((c: any) => {
-                if (c.type === 'text') {
-                  parts.push({ text: c.text || '' });
-                } else if (c.type === 'image_url' && c.image_url?.url?.includes('base64,')) {
-                  const [meta, base64Data] = c.image_url.url.split('base64,');
-                  const mimeType = meta.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
-                  parts.push({ inlineData: { mimeType, data: base64Data } });
-                } else if (c.type === 'pdf_file' && c.base64Data) {
-                  const rawBase64 = c.base64Data.includes('base64,') ? c.base64Data.split('base64,')[1] : c.base64Data;
-                  parts.push({ inlineData: { mimeType: 'application/pdf', data: rawBase64 } });
-                }
-              });
-            } else {
-              parts = [{ text: String(m.content) }];
-            }
-            return { role: m.role === 'assistant' ? 'model' : 'user', parts };
-          });
+          body.contents = currentMessages.map((m: any) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: Array.isArray(m.content) ? m.content.map((c: any) => {
+              if (c.type === 'text') return { text: c.text };
+              if (c.type === 'image_url') return { inlineData: { mimeType: 'image/jpeg', data: c.image_url.url.split('base64,')[1] } };
+              if (c.type === 'pdf_file') return { inlineData: { mimeType: 'application/pdf', data: c.base64Data.split('base64,')[1] } };
+              return { text: '' };
+            }) : [{ text: String(m.content) }]
+          }));
         }
 
         const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         const rawData = await response.json();
         if (!response.ok) throw new Error(JSON.stringify(rawData));
 
+        // [OpenAI 도구 루프]
         if (engine.provider === 'openai') {
           const assistantMessage = rawData.choices[0].message;
-          if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
-            return { success: true, data: { text: assistantMessage.content || '', rawMessage: assistantMessage } };
-          }
+          if (!assistantMessage.tool_calls) return { success: true, data: { text: assistantMessage.content || '', rawMessage: assistantMessage } };
+          
           currentMessages.push(assistantMessage);
-
-          for (const toolCall of assistantMessage.tool_calls) {
-            const toolName = toolCall.function.name;
-            const toolArgs = JSON.parse(toolCall.function.arguments);
-
-            console.log(`⚙️ [MCP 루프] OpenAI 도구 가동: ${toolName}`);
-            const toolResult = await pluginManager.routeCallTool(toolName, toolArgs, mainWindow!);
-
-            currentMessages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              name: toolName,
-              content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)
-            });
+          for (const tc of assistantMessage.tool_calls) {
+            const res = await pluginManager.routeCallTool(tc.function.name, JSON.parse(tc.function.arguments), mainWindow!);
+            currentMessages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(res) });
           }
           continue;
         }
 
+        // [Anthropic 도구 루프]
         if (engine.provider === 'anthropic') {
-          const isToolUse = rawData.stop_reason === 'tool_use' || rawData.content?.some((b: any) => b.type === 'tool_use');
-
-          if (!isToolUse) {
-            const textBlock = rawData.content?.find((b: any) => b.type === 'text');
-            const finalReplyText = textBlock?.text ?? '';
-            return { success: true, data: { text: finalReplyText, rawMessage: { role: 'assistant', content: finalReplyText } } };
-          }
+          const isToolUse = rawData.content?.some((b: any) => b.type === 'tool_use');
+          if (!isToolUse) return { success: true, data: { text: rawData.content[0].text, rawMessage: { role: 'assistant', content: rawData.content } } };
 
           currentMessages.push({ role: 'assistant', content: rawData.content });
-          const toolRequests = rawData.content.filter((b: any) => b.type === 'tool_use');
-          const toolResultsBlocks: any[] = [];
-
-          for (const req of toolRequests) {
-            console.log(`⚙️ [MCP 루프] Claude 도구 가동: ${req.name}`);
-            const toolResult = await pluginManager.routeCallTool(req.name, req.input, mainWindow!);
-
-            let resultText = '';
-            if (toolResult && toolResult.content && toolResult.content[0]) {
-              resultText = toolResult.content[0].text || JSON.stringify(toolResult);
-            } else {
-              resultText = JSON.stringify(toolResult);
-            }
-
-            toolResultsBlocks.push({
-              type: 'tool_result',
-              tool_use_id: req.id,
-              content: resultText
-            });
+          const toolResults = [];
+          for (const block of rawData.content.filter((b: any) => b.type === 'tool_use')) {
+            const res = await pluginManager.routeCallTool(block.name, block.input, mainWindow!);
+            toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(res) });
           }
-          currentMessages.push({ role: 'user', content: toolResultsBlocks });
+          currentMessages.push({ role: 'user', content: toolResults });
           continue;
         }
 
-        if (engine.provider === 'google') {
-          const text = rawData.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-          return { success: true, data: { text, rawMessage: { role: 'assistant', content: text } } };
-        }
         break;
       }
-      return { success: false, error: '지원하지 않는 provider 구조체 chain 오류' };
     } catch (error: any) {
       console.error("🚨 Proxy Error:", error);
       return { success: false, error: error.message };
