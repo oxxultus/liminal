@@ -29,6 +29,7 @@
     "@google/genai": "^2.6.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.16.1",
+    "framer-motion": "^12.40.0",
     "openai": "^6.39.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -70,7 +71,7 @@
       {
         "provider": "github",
         "owner": "oxxultus",
-        "repo": "liminal-desktop" 
+        "repo": "liminal-desktop"
       }
     ],
     "win": {

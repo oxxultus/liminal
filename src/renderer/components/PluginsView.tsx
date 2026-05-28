@@ -1,5 +1,7 @@
 // src/renderer/components/PluginsView.tsx
 import React, { useState, useEffect, useRef } from 'react';
+// 💡 [신규 추가] 자연스러운 레이아웃 전환 애니메이션을 위한 framer-motion 임포트
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Icon = {
   Plus: () => (
@@ -31,6 +33,31 @@ const Icon = {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
     </svg>
+  ),
+  EmptyState: () => (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-text-muted)', opacity: 0.6, marginBottom: '12px' }}>
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
+    </svg>
+  ),
+  Unlock: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: '5px', verticalAlign: 'middle' }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+    </svg>
+  ),
+  Activity: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: '5px', verticalAlign: 'middle' }}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  ),
+  Sleep: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: '5px', verticalAlign: 'middle' }}>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+  ),
+  Tag: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: '5px', verticalAlign: 'middle' }}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+    </svg>
   )
 };
 
@@ -39,18 +66,14 @@ export default function PluginsView() {
   const [statusMsg, setStatusMsg] = useState('');
   const [hoveredPluginId, setHoveredPluginId] = useState<string | null>(null);
 
-  // 원격 서버 플러그인들의 가동 상태 보관소
   const [onlineStates, setOnlineStates] = useState<Record<string, boolean>>({});
 
-  // 모달 제어 상태 스위치
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
 
-  // 더보기 컨텍스트 메뉴용 제어 상태
   const [menuOpenPluginId, setMenuOpenPluginId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 폼 입력 관리 유닛 상태
   const [pluginType, setPluginType] = useState<'remote' | 'custom' | 'local'>('remote');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -58,23 +81,18 @@ export default function PluginsView() {
   const [downloadUrl, setDownloadUrl] = useState('');
   const [customScriptPath, setCustomScriptPath] = useState('');
   
-  // 작업 경로 선택 지정 스위치 및 경로 명세 상태
   const [useWorkspace, setUseWorkspace] = useState(true);
   const [pluginWorkspaceDir, setPluginWorkspaceDir] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   
-  // 수정 타겟팅 포인터
   const [targetPluginId, setTargetPluginId] = useState<string | null>(null);
 
-  // 인터벌 클로저 버그 전면 차단용 레퍼런스 포인터
   const pluginsRef = useRef<any[]>([]);
   useEffect(() => {
     pluginsRef.current = installedPlugins;
   }, [installedPlugins]);
 
-  // 메인 프로세스의 헬스 캐시 데이터를 실시간으로 동기화하는 함수
   const checkRemotePluginsHealth = async (plugins: any[]) => {
-    // 💡 [수정] 사용자에 의해 '활성화(enabled)'된 리모트 플러그인만 필터링하여 불필요한 네트워크 스캔 제거
     const remotePlugins = plugins.filter(p => p.type === 'remote' && p.enabled);
     if (remotePlugins.length === 0) return;
     
@@ -98,11 +116,17 @@ export default function PluginsView() {
   const refreshPluginsList = async () => {
     const list = await window.electronAPI.getMcpPluginsList();
     const cleanList = list || [];
-    setInstalledPlugins(cleanList);
-    checkRemotePluginsHealth(cleanList); 
+    
+    const sortedList = [...cleanList].sort((a, b) => {
+      const aEnabled = a.enabled !== false ? 1 : 0;
+      const bEnabled = b.enabled !== false ? 1 : 0;
+      return bEnabled - aEnabled;
+    });
+
+    setInstalledPlugins(sortedList);
+    checkRemotePluginsHealth(sortedList); 
   };
 
-  // 실시간 15초 인터벌 동기화 가동
   useEffect(() => {
     refreshPluginsList();
 
@@ -116,7 +140,6 @@ export default function PluginsView() {
     return () => clearInterval(liveTracker);
   }, []);
 
-  // 외부 클릭 감지 리스너
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -127,7 +150,6 @@ export default function PluginsView() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [menuOpenPluginId]);
 
-  // 💡 [신규] 토글 스위치 작동 시 핸들러 함수
   const handleToggleEnable = async (pluginId: string, currentStatus: boolean) => {
     if (!window.electronAPI.toggleMcpPlugin) return;
     
@@ -135,17 +157,26 @@ export default function PluginsView() {
     const res = await window.electronAPI.toggleMcpPlugin({ pluginId, enabled: nextStatus });
     
     if (res.success) {
-      // 로컬 스태이트 즉시 갱신
-      setInstalledPlugins(prev => 
-        prev.map(p => p.id === pluginId ? { ...p, enabled: nextStatus } : p)
+      const updatedList = installedPlugins.map(p => 
+        p.id === pluginId ? { ...p, enabled: nextStatus } : p
       );
-      // 리모트 플러그인을 꺼버린 경우 실시간 상태 불빛도 초기화
+      
+      const sortedList = [...updatedList].sort((a, b) => {
+        const aEnabled = a.enabled !== false ? 1 : 0;
+        const bEnabled = b.enabled !== false ? 1 : 0;
+        return bEnabled - aEnabled;
+      });
+
+      setInstalledPlugins(sortedList);
+
       if (!nextStatus) {
         setOnlineStates(prev => {
           const updated = { ...prev };
           delete updated[pluginId];
           return updated;
         });
+      } else {
+        checkRemotePluginsHealth(sortedList);
       }
     } else {
       alert(`상태 전환 실패: ${res.error}`);
@@ -198,7 +229,7 @@ export default function PluginsView() {
       apiKey: targetPlugin.apiKey,
       workspaceDir: targetPlugin.workspaceDir,
       keywords: parsedKeywords,
-      enabled: targetPlugin.enabled // 기존 기조 유지
+      enabled: targetPlugin.enabled 
     };
 
     const res = await window.electronAPI.addMcpPlugin(updateConfig as any);
@@ -228,7 +259,7 @@ export default function PluginsView() {
       id: generatedId,
       name: name.trim(),
       keywords: parsedKeywords,
-      enabled: true // 최초 장착 시 활성화가 기본값
+      enabled: true 
     };
 
     if (pluginType === 'remote') {
@@ -330,199 +361,222 @@ export default function PluginsView() {
         <section style={{ marginTop: '8px' }}>
           {installedPlugins.length === 0 ? (
             <div style={{ 
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem', fontWeight: 500,
               background: 'var(--bg-glass-card)', borderRadius: '16px', border: 'var(--border-glass)'
             }}>
-              🔌 장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
+              <Icon.EmptyState />
+              장착된 MCP 플러그인이 없습니다. 상단의 Add Plugin 버튼을 눌러 추가하세요.
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', width: '100%' }}>
-              {installedPlugins.map((p) => {
-                const isRemote = p.type === 'remote';
-                const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
-                const hasWorkspace = p.workspaceDir && p.workspaceDir.trim().length > 0;
-                
-                // 해당 플러그인이 켜져있는지 상태값 파싱 (기본값 true 처리)
-                const isEnabled = p.enabled !== false;
-                const isServerOnline = onlineStates[p.id] ?? false;
+            // 💡 [변경] framer-motion이 하위 컴포넌트들의 레이아웃 흐름 변형을 추적하도록 div ➡️ motion.div 래핑
+            <motion.div 
+              layout 
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', width: '100%' }}
+            >
+              <AnimatePresence mode="popLayout">
+                {installedPlugins.map((p) => {
+                  const isRemote = p.type === 'remote';
+                  const hasKeywords = p.keywords && (Array.isArray(p.keywords) ? p.keywords.length > 0 : String(p.keywords).trim().length > 0);
+                  const hasWorkspace = p.workspaceDir && p.workspaceDir.trim().length > 0;
+                  
+                  const isEnabled = p.enabled !== false;
+                  const isServerOnline = onlineStates[p.id] ?? false;
 
-                return (
-                  <div 
-                    key={p.id}
-                    onMouseEnter={() => setHoveredPluginId(p.id)}
-                    onMouseLeave={() => setHoveredPluginId(null)}
-                    style={{
-                      background: 'var(--bg-glass-card)', border: 'var(--border-glass)',
-                      borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
-                      gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
-                      height: '135px', boxSizing: 'border-box',
-                      width: '100%', minWidth: 0,
-                      // 💡 비활성화 시 카드를 반투명 처리하여 시각적 직관성 확보
-                      opacity: isEnabled ? 1 : 0.52,
-                      transition: 'opacity 0.2s ease, transform 0.2s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '52%' }}>
-                        <span style={{ color: 'var(--color-text-muted)', opacity: isEnabled ? 0.8 : 0.4, display: 'flex', alignItems: 'center' }}>
-                          {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
-                        </span>
-                        <span style={{ 
-                          textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', 
-                          fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)',
-                          textDecoration: isEnabled ? 'none' : 'line-through', opacity: isEnabled ? 1 : 0.6
-                        }}>{p.name}</span>
-                      </div>
-                      
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                        {/* 💡 [신규 추가] 미니 토글 슬라이더 스위치 UI 소켓 */}
-                        <div 
-                          onClick={() => handleToggleEnable(p.id, isEnabled)}
-                          style={{
-                            width: '28px', height: '16px', borderRadius: '999px',
-                            backgroundColor: isEnabled ? 'var(--color-text-main)' : 'rgba(128,128,128,0.2)',
-                            cursor: 'pointer', position: 'relative', transition: 'background-color 0.2s ease',
-                            border: '1px solid rgba(128,128,128,0.1)'
-                          }}
-                          title={isEnabled ? "플러그인 끄기" : "플러그인 켜기"}
-                        >
-                          <div style={{
-                            width: '12px', height: '12px', borderRadius: '50%',
-                            backgroundColor: isEnabled ? 'var(--color-btn-text)' : '#ffffff',
-                            position: 'absolute', top: '2px',
-                            left: isEnabled ? '14px' : '2px',
-                            transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
-                          }} />
+                  return (
+                    // 💡 [변경] 카드가 삭제되거나 정렬 바뀔 때 유연하게 애니메이션을 타도록 motion.div 이식 및 layout 속성 주입
+                    <motion.div 
+                      key={p.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: isEnabled ? 1 : 0.52, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ 
+                        type: 'spring', 
+                        stiffness: 400, 
+                        damping: 38,
+                        opacity: { duration: 0.25 }
+                      }}
+                      onMouseEnter={() => setHoveredPluginId(p.id)}
+                      onMouseLeave={() => setHoveredPluginId(null)}
+                      style={{
+                        background: 'var(--bg-glass-card)', border: 'var(--border-glass)',
+                        borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
+                        gap: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', position: 'relative',
+                        height: '135px', boxSizing: 'border-box',
+                        width: '100%', minWidth: 0,
+                        transition: 'box-shadow 0.2s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '52%' }}>
+                          <span style={{ color: 'var(--color-text-muted)', opacity: isEnabled ? 0.8 : 0.4, display: 'flex', alignItems: 'center' }}>
+                            {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
+                          </span>
+                          <span style={{ 
+                            textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', 
+                            fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-main)',
+                            opacity: isEnabled ? 1 : 0.6
+                          }}>{p.name}</span>
                         </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, position: 'relative' }}>
+                          {isRemote && isEnabled && (
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '4px',
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                              color: isServerOnline ? '#10b981' : '#6e6e7a',
+                              backgroundColor: isServerOnline ? 'rgba(16, 185, 129, 0.08)' : 'rgba(110, 110, 122, 0.08)',
+                              padding: '3px 6px',
+                              borderRadius: '5px',
+                              border: isServerOnline ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(110, 110, 122, 0.15)'
+                            }}>
+                              <span style={{ 
+                                width: '5px', 
+                                height: '5px', 
+                                borderRadius: '50%', 
+                                backgroundColor: isServerOnline ? '#10b981' : '#6e6e7a',
+                                display: 'inline-block',
+                                boxShadow: isServerOnline ? '0 0 6px #10b981' : 'none'
+                              }} />
+                              {isServerOnline ? 'ONLINE' : 'OFFLINE'}
+                            </div>
+                          )}
+                          <span style={getBadgeTypeStyle(p.type, isEnabled)}>
+                            {p.type}
+                          </span>
 
-                        {isRemote && isEnabled && (
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '4px',
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            color: isServerOnline ? '#10b981' : '#6e6e7a',
-                            backgroundColor: isServerOnline ? 'rgba(16, 185, 129, 0.08)' : 'rgba(110, 110, 122, 0.08)',
-                            padding: '3px 6px',
-                            borderRadius: '5px',
-                            border: isServerOnline ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(110, 110, 122, 0.15)'
-                          }}>
-                            <span style={{ 
-                              width: '5px', 
-                              height: '5px', 
-                              borderRadius: '50%', 
-                              backgroundColor: isServerOnline ? '#10b981' : '#6e6e7a',
-                              display: 'inline-block',
-                              boxShadow: isServerOnline ? '0 0 6px #10b981' : 'none'
+                          {/* 활성화 상태일 때 아름다운 초록색(#10b981) 스위치 배경 렌더링 및 내부 원형 수직 정중앙 매칭 */}
+                          <div 
+                            onClick={() => handleToggleEnable(p.id, isEnabled)}
+                            style={{
+                              width: '28px', height: '16px', borderRadius: '999px',
+                              backgroundColor: isEnabled ? '#10b981' : 'rgba(128,128,128,0.2)',
+                              cursor: 'pointer', position: 'relative', transition: 'background-color 0.2s ease',
+                              border: '1px solid rgba(128,128,128,0.1)',
+                              display: 'flex', alignItems: 'center', marginLeft: '2px'
+                            }}
+                            title={isEnabled ? "플러그인 비활성화" : "플러그인 활성화"}
+                          >
+                            <div style={{
+                              width: '12px', height: '12px', borderRadius: '50%',
+                              backgroundColor: '#ffffff',
+                              position: 'absolute',
+                              top: '50%',
+                              transform: 'translateY(-50%)', 
+                              left: isEnabled ? '13px' : '1px',
+                              transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
                             }} />
-                            {isServerOnline ? 'ONLINE' : 'OFFLINE'}
                           </div>
-                        )}
-                        <span style={getBadgeTypeStyle(p.type, isEnabled)}>
-                          {p.type}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        {isRemote ? 'Endpoint Connection' : 'Local Workspace'}
-                      </div>
-                      
-                      <div style={{ width: '100%', overflow: 'hidden', minWidth: 0 }}>
-                        <div 
-                          style={{ 
-                            fontSize: '0.82rem', 
-                            color: 'var(--color-text-main)', 
-                            fontFamily: 'monospace', 
-                            marginTop: '2px', 
-                            wordBreak: 'keep-all', 
-                            whiteSpace: 'nowrap', 
-                            overflowX: 'auto', 
-                            maxWidth: '100%',
-                            paddingBottom: '4px',
-                            opacity: isEnabled ? 1 : 0.5
-                          }} 
-                          title={isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '지정되지 않음 (제한 없음)')}
-                        >
-                          {isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '🔓 지정되지 않음 (제한 없음)')}
                         </div>
                       </div>
-                    </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', opacity: isEnabled ? 1 : 0.5 }}>
-                        {isEnabled ? (hasKeywords ? `🎯 키워드: ${p.keywords}` : '🔓 상시 대기조') : '💤 비활성화됨'}
+                      <div style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {isRemote ? 'Endpoint Connection' : 'Local Workspace'}
+                        </div>
+                        
+                        <div style={{ width: '100%', overflow: 'hidden', minWidth: 0 }}>
+                          <div 
+                            style={{ 
+                              fontSize: '0.82rem', 
+                              color: 'var(--color-text-main)', 
+                              fontFamily: 'monospace', 
+                              marginTop: '2px', 
+                              wordBreak: 'keep-all', 
+                              whiteSpace: 'nowrap', 
+                              overflowX: 'auto', 
+                              maxWidth: '100%',
+                              paddingBottom: '4px',
+                              opacity: isEnabled ? 1 : 0.5
+                            }} 
+                            title={isRemote ? p.url : (hasWorkspace ? p.workspaceDir : '지정되지 않음 (제한 없음)')}
+                          >
+                            {isRemote ? p.url : (hasWorkspace ? p.workspaceDir : <><Icon.Unlock />지정되지 않음 (제한 없음)</>)}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* 더보기 버튼 */}
-                    {(hoveredPluginId === p.id || menuOpenPluginId === p.id) && (
-                      <button
-                        onClick={(e) => handleOpenMenu(e, p.id)}
-                        style={{
-                          position: 'absolute', bottom: '12px', right: '14px',
-                          background: 'transparent', border: 'none',
-                          color: menuOpenPluginId === p.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
-                          cursor: 'pointer', padding: '4px', borderRadius: '4px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          zIndex: 10
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
-                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                      >
-                        <Icon.More />
-                      </button>
-                    )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '8px' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', opacity: isEnabled ? 1 : 0.5 }}>
+                          {isEnabled ? (
+                            hasKeywords ? <><Icon.Tag />키워드: {p.keywords}</> : <><Icon.Activity />상시 대기조</>
+                          ) : (
+                            <><Icon.Sleep />비활성화됨</>
+                          )}
+                        </div>
+                      </div>
 
-                    {/* 카드 내부 메뉴 드롭다운 */}
-                    {menuOpenPluginId === p.id && (
-                      <div
-                        ref={menuRef}
-                        style={{
-                          position: 'absolute', bottom: '38px', right: '14px',
-                          backgroundColor: 'var(--bg-bubble-bot)', backdropFilter: 'blur(20px)',
-                          border: 'var(--border-glass)', borderRadius: '10px',
-                          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)', padding: '4px', zIndex: 9999,
-                          display: 'flex', flexDirection: 'column', gap: '1px', width: '120px',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      {/* 더보기 버튼 */}
+                      {(hoveredPluginId === p.id || menuOpenPluginId === p.id) && (
                         <button
-                          onClick={() => handleStartEditModal(p.id, p.name, p.keywords)}
+                          onClick={(e) => handleOpenMenu(e, p.id)}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
-                            border: 'none', background: 'transparent', borderRadius: '6px',
-                            fontSize: '0.78rem', fontWeight: 500, color: 'var(--color-text-main)', cursor: 'pointer',
-                            textAlign: 'left', width: '100%'
+                            position: 'absolute', bottom: '12px', right: '14px',
+                            background: 'transparent', border: 'none',
+                            color: menuOpenPluginId === p.id ? 'var(--color-text-main)' : 'var(--color-text-muted)', 
+                            cursor: 'pointer', padding: '4px', borderRadius: '4px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            zIndex: 10
                           }}
                           onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
                           onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
-                          <Icon.Edit /> 플러그인 수정
+                          <Icon.More />
                         </button>
-                        <button
-                          onClick={() => handleRemovePlugin(p.id, p.name)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
-                            border: 'none', background: 'transparent', borderRadius: '6px',
-                            fontSize: '0.78rem', fontWeight: 500, color: '#ef4444', cursor: 'pointer',
-                            textAlign: 'left', width: '100%'
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                          <Icon.Trash /> 삭제하기
-                        </button>
-                      </div>
-                    )}
+                      )}
 
-                  </div>
-                );
-              })}
-            </div>
+                      {/* 카드 내부 메뉴 드롭다운 */}
+                      {menuOpenPluginId === p.id && (
+                        <div
+                          ref={menuRef}
+                          style={{
+                            position: 'absolute', bottom: '38px', right: '14px',
+                            backgroundColor: 'var(--bg-bubble-bot)', backdropFilter: 'blur(20px)',
+                            border: 'var(--border-glass)', borderRadius: '10px',
+                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)', padding: '4px', zIndex: 9999,
+                            display: 'flex', flexDirection: 'column', gap: '1px', width: '120px',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => handleStartEditModal(p.id, p.name, p.keywords)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+                              border: 'none', background: 'transparent', borderRadius: '6px',
+                              fontSize: '0.78rem', fontWeight: 500, color: 'var(--color-text-main)', cursor: 'pointer',
+                              textAlign: 'left', width: '100%'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.08)')}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          >
+                            <Icon.Edit /> 플러그인 수정
+                          </button>
+                          <button
+                            onClick={() => handleRemovePlugin(p.id, p.name)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px',
+                              border: 'none', background: 'transparent', borderRadius: '6px',
+                              fontSize: '0.78rem', fontWeight: 500, color: '#ef4444', cursor: 'pointer',
+                              textAlign: 'left', width: '100%'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <Icon.Trash /> 삭제하기
+                          </button>
+                        </div>
+                      )}
+
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
           )}
         </section>
 
@@ -645,7 +699,7 @@ export default function PluginsView() {
         {isEditModalOpen && (
           <div style={{
             position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(10px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(15px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
           }} onClick={() => { setIsEditModalOpen(false); setTargetPluginId(null); }}>
             <div style={{
