@@ -140,6 +140,9 @@ export default function PluginsView() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [menuOpenPluginId]);
 
+  // =========================================================================
+  // 🎯 [정밀 수선 완료] 토글 활성화 시 백엔드가 가로챈 최신 버전을 즉시 재동기화
+  // =========================================================================
   const handleToggleEnable = async (pluginId: string, currentStatus: boolean) => {
     if (!window.electronAPI.toggleMcpPlugin) return;
     
@@ -147,17 +150,9 @@ export default function PluginsView() {
     const res = await window.electronAPI.toggleMcpPlugin({ pluginId, enabled: nextStatus });
     
     if (res.success) {
-      const updatedList = installedPlugins.map(p => 
-        p.id === pluginId ? { ...p, enabled: nextStatus } : p
-      );
-      
-      const sortedList = [...updatedList].sort((a, b) => {
-        const aEnabled = a.enabled !== false ? 1 : 0;
-        const bEnabled = b.enabled !== false ? 1 : 0;
-        return bEnabled - aEnabled;
-      });
-
-      setInstalledPlugins(sortedList);
+      // 💡 [핵심 패치] 백엔드가 단독 로드 과정(toggleSinglePlugin)에서 파싱해 둔 
+      //     최신 버전을 DB로부터 완벽히 재동기화하기 위해 refresh 함수를 연쇄 가동합니다.
+      await refreshPluginsList();
 
       if (!nextStatus) {
         setOnlineStates(prev => {
@@ -165,8 +160,6 @@ export default function PluginsView() {
           delete updated[pluginId];
           return updated;
         });
-      } else {
-        checkRemotePluginsHealth(sortedList);
       }
     } else {
       alert(`상태 전환 실패: ${res.error}`);
@@ -332,23 +325,26 @@ export default function PluginsView() {
   };
 
   const getBorderColor = (p: any, isEnabled: boolean, isServerOnline: boolean) => {
-    if (!isEnabled) return 'var(--border-glass)'; // 비활성화는 기본 테두리
+    if (!isEnabled) return 'var(--border-glass)'; 
     if (p.type === 'remote') {
-      return isServerOnline ? '#3b82f6' : '#ef4444'; // 연결 성공(Blue) / 유실(Red)
+      return isServerOnline ? '#3b82f6' : '#ef4444'; 
     }
-    return '#f59e0b'; // Custom은 항상 오렌지색 테두리
+    return '#f59e0b'; 
   };
 
   const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' };
 
   return (
     <div style={{ width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'transparent', boxSizing: 'border-box' }}>
-      {/* 💡 [네트워크 펄스 전용] 파란색 연결 인디케이터용 키프레임 정의 */}
       <style>{`
         @keyframes mcp-network-pulse {
           0% { transform: scale(0.95); opacity: 0.5; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
           50% { transform: scale(1.05); opacity: 1; box-shadow: 0 0 8px 2px rgba(59, 130, 246, 0.4); }
           100% { transform: scale(0.95); opacity: 0.5; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        @keyframes mcp-error-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.2; }
         }
       `}</style>
 
@@ -430,12 +426,11 @@ export default function PluginsView() {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {/* 왼쪽 명세 정보 레이아웃 */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '60%', flexWrap: 'nowrap' }}>
                           
                           <span style={{ 
                             color: isRemote 
-                              ? (isServerOnline && isEnabled ? '#10b981' : 'var(--color-text-muted)') 
+                              ? (isServerOnline && isEnabled ? '#3b82f6' : 'var(--color-text-muted)') 
                               : (isEnabled ? 'var(--color-text-main)' : 'var(--color-text-muted)'), 
                             opacity: isEnabled ? 1 : 0.4, 
                             display: 'flex', 
@@ -445,7 +440,6 @@ export default function PluginsView() {
                             {isRemote ? <Icon.Globe /> : <Icon.Terminal />}
                           </span>
 
-                          {/* 🟢 [활성화 고정 불빛] 플러그인이 켜지면 상시 대기중임을 알리는 심플 고정 그린 라이트 */}
                           {isEnabled && (
                             <span style={{
                               width: '6px', height: '6px', borderRadius: '50%',
@@ -454,15 +448,14 @@ export default function PluginsView() {
                             }} />
                           )}
 
-                          {/* 🔵🔴 [네트워크 연결 단독 지표] 원격 서버 타겟일 때만 가동되는 파란색/회색 듀얼 실시간 검증 라이트 */}
                           {isRemote && isEnabled && (
                             <span style={{
                               width: '6px', height: '6px', borderRadius: '50%',
                               backgroundColor: isServerOnline ? '#3b82f6' : '#ef4444',
                               flexShrink: 0,
-                              // 연결 상태에 따라 애니메이션 클래스 제어
                               animation: isServerOnline ? 'mcp-network-pulse 1.5s infinite' : 'mcp-error-blink 1s infinite',
-                              boxShadow: isServerOnline ? '0 0 5px #3b82f6' : '0 0 5px #ef4444'
+                              boxShadow: isServerOnline ? '0 0 5px #3b82f6' : '0 0 5px #ef4444',
+                              marginLeft: '-2px'
                             }} />
                           )}
 
@@ -473,9 +466,7 @@ export default function PluginsView() {
                           }}>{p.name}</span>
                         </div>
                         
-                        {/* 우측 상단 순수 명세 배지 집합소 */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-                          {/* TYPE 배지 */}
                           <span style={{
                             ...baseBadgeStyle,
                             color: '#fff',
@@ -488,7 +479,6 @@ export default function PluginsView() {
                             {p.type}
                           </span>
 
-                          {/* VERSION 배지 */}
                           <span style={{
                             ...baseBadgeStyle,
                             fontFamily: 'monospace',
@@ -534,7 +524,6 @@ export default function PluginsView() {
                         </div>
                       </div>
 
-                      {/* 더보기 버튼 */}
                       {(hoveredPluginId === p.id || menuOpenPluginId === p.id) && (
                         <button
                           onClick={(e) => handleOpenMenu(e, p.id)}
@@ -553,7 +542,6 @@ export default function PluginsView() {
                         </button>
                       )}
 
-                      {/* 카드 내부 메뉴 드롭다운 */}
                       {menuOpenPluginId === p.id && (
                         <div
                           ref={menuRef}
@@ -663,6 +651,7 @@ export default function PluginsView() {
                       </div>
                     ) : (
                       <div>
+                        <div style={labelStyle}>JavaScript File Path</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                           <input type="text" value={customScriptPath} onChange={e => setCustomScriptPath(e.target.value)} placeholder="/Users/.../tool.js" required style={{ ...inputStyle, flexGrow: 1 }} />
                           <button type="button" onClick={handleSelectFile} style={{ padding: '10px 14px', background: 'rgba(128,128,128,0.1)', border: '1px solid rgba(128,128,128,0.15)', color: 'var(--color-text-main)', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
@@ -737,7 +726,7 @@ export default function PluginsView() {
               </div>
 
               <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Plugin Alias</div>
+                <div style={labelStyle}>Plugin Alias</div>
                 <input
                   type="text"
                   value={name}
@@ -749,7 +738,7 @@ export default function PluginsView() {
               </div>
 
               <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Trigger Keywords (쉼표 구분)</div>
+                <div style={labelStyle}>Trigger Keywords (쉼표 구분)</div>
                 <input
                   type="text"
                   value={keywordsInput}
@@ -761,7 +750,7 @@ export default function PluginsView() {
 
               {installedPlugins.find(p => p.id === targetPluginId)?.type !== 'remote' && (
                 <div style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>파일 작업 디렉토리(Workspace) 경로</div>
+                  <div style={labelStyle}>파일 작업 디렉토리(Workspace) 경로</div>
                   <input
                     type="text"
                     value={pluginWorkspaceDir}

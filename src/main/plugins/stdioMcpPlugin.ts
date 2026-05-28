@@ -10,6 +10,9 @@ export class StdioMcpPlugin implements McpPlugin {
   public filePath: string;
   public workspaceDir?: string;
 
+  // 💡 [신규 추가] 스크립트 내부 JSON-RPC 통신을 통해 실시간 추출해낸 플러그인 버전 필드
+  public version: string = '1.0.0';
+
   // 💡 스크립트 내부에서 JSON-RPC 통신으로 동적 추출해온 키워드들을 저장하는 독립 필드
   public scriptKeywords: string[] = [];
 
@@ -33,7 +36,6 @@ export class StdioMcpPlugin implements McpPlugin {
   }
 
   private startProcess() {
-    // 💡 [수정] 원본이 .mjs였거나, custom-xxx.js 로 복사되었더라도 ESM 규격으로 안전하게 실행되도록 체크
     const isEsm = this.filePath.endsWith('.mjs') || this.filePath.endsWith('.js');
 
     const env: NodeJS.ProcessEnv = {
@@ -44,8 +46,6 @@ export class StdioMcpPlugin implements McpPlugin {
       env.WORKSPACE_DIR = this.workspaceDir;
     }
 
-    // 💡 [전략 2 핵심] 스크립트 파일이 위치한 디렉토리(userData/external_plugins)를 
-    //    CWD(실행 컨텍스트)로 강제 지정하여 바로 옆에 있는 격리된 node_modules를 참조하게 만듭니다.
     const runtimeCwd = path.dirname(this.filePath);
 
     const spawnOptions: any = {
@@ -55,7 +55,6 @@ export class StdioMcpPlugin implements McpPlugin {
     };
 
     if (isEsm) {
-      // 최신 Node.js 환경에서 ESM 모듈 간의 호환성을 보장하고 경고를 방지하기 위한 실행 옵션 주입
       spawnOptions.execArgv = ['--experimental-modules'];
     }
 
@@ -126,6 +125,14 @@ export class StdioMcpPlugin implements McpPlugin {
   async listTools(): Promise<McpTool[]> {
     try {
       const result = await this.sendRequest('tools/list');
+
+      // =========================================================================
+      // 💡 [신규 추가] 인터셉트 패킷 내부 바디에 수록된 버전을 동적으로 확보
+      // =========================================================================
+      if (result && result.version) {
+        this.version = String(result.version).trim();
+        console.log(`⚙️ [${this.name}] Stdio 통신 라인 내 동적 버전 갱신 감지: v${this.version}`);
+      }
 
       if (result && result.keywords && Array.isArray(result.keywords)) {
         this.scriptKeywords = result.keywords.map((k: any) => String(k).trim()).filter(Boolean);
