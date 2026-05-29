@@ -17,6 +17,11 @@ interface SelectedStep {
   pluginId: string;
 }
 
+interface SequenceVariable {
+  key: string;
+  value: string;
+}
+
 interface SavedSequence {
   id: string;
   name: string;
@@ -25,6 +30,7 @@ interface SavedSequence {
   isEnabled: boolean; 
   lastRunTimestamp: number | null;
   steps?: SelectedStep[]; 
+  variables?: SequenceVariable[]; // 💡 커스텀 가변 데이터 사양 수급
 }
 
 const Icon = {
@@ -34,7 +40,9 @@ const Icon = {
   Close: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   Clock: () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   Help: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
-  ArrowDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
+  ArrowDown: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+  ArrowUp: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>,
+  FlowDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
   Empty: () => <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>,
   Gear: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   Pin: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.12-2.58A2 2 0 0 1 16 10.18V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5.18a2 2 0 0 1-.44 1.24L5.44 14a2 2 0 0 0-.44 1.24z"/></svg>,
@@ -45,13 +53,15 @@ const Icon = {
   More: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
   Edit: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>,
   Activity: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
-  Network: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8M5 16v-3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/></svg>
+  Network: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8M5 16v-3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/></svg>,
+  CheckCircle: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
 };
 
 export default function AutomationView() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [savedSequences, setSavedSequences] = useState<SavedSequence[]>([]);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [failedSequenceIds, setFailedSequenceIds] = useState<Set<string>>(new Set());
   
   const [plugins, setPlugins] = useState<any[]>([]);
   const [availableTools, setAvailableTools] = useState<McpTool[]>([]);
@@ -63,8 +73,15 @@ export default function AutomationView() {
   const [sequenceDesc, setSequenceDesc] = useState('');
   const [cronExpr, setCronExpr] = useState('0 3 * * *'); 
   const [steps, setSteps] = useState<SelectedStep[]>([]);
+  const [variables, setVariables] = useState<SequenceVariable[]>([]); // 💡 커스텀 변수 상태 추가
   const [draggingTool, setDraggingTool] = useState<McpTool | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [failedStepIndex, setFailedStepIndex] = useState<number | null>(null);
+  const [failedError, setFailedError] = useState<string | null>(null);
+  const [tooltipStepId, setTooltipStepId] = useState<string | null>(null);
+
+  // 💡 특정 스텝 노드의 접힘/펼침(Collapse) 상태를 제어하기 위한 인프라 풀
+  const [collapsedSteps, setCollapsedSteps] = useState<Set<string>>(new Set());
 
   // 실시간 관제 및 네이티브 컨펌 대체 브릿지 훅
   const [runningSequenceId, setRunningSequenceId] = useState<string | null>(null);
@@ -72,7 +89,14 @@ export default function AutomationView() {
   const [confirmModalTarget, setConfirmModalTarget] = useState<SavedSequence | null>(null);
   const [deleteModalTarget, setDeleteModalTarget] = useState<SavedSequence | null>(null);
 
-  const [menuOpenSeqId, setMenuOpenSeqId] = useState<string | null>(null);
+  const [completedSequenceIds, setCompletedSequenceIds] = useState<Set<string>>(new Set());
+
+  const menuOpenSeqIdRef = useRef<string | null>(null);
+  const [menuOpenSeqId, setMenuOpenSeqIdState] = useState<string | null>(null);
+  const setMenuOpenSeqId = (id: string | null) => {
+    menuOpenSeqIdRef.current = id;
+    setMenuOpenSeqIdState(id);
+  };
   const menuRef = useRef<HTMLDivElement>(null);
 
   const fetchAutomationData = async () => {
@@ -107,36 +131,50 @@ export default function AutomationView() {
   useEffect(() => {
     fetchAutomationData();
 
-    // ✅ 크론 실행 이벤트 수신
     if (window.electronAPI.onSequenceStatus) {
-        window.electronAPI.onSequenceStatus((data: {
+      window.electronAPI.onSequenceStatus((data: {
         sequenceId: string;
         status: 'running' | 'completed' | 'failed';
         stepIndex: number | null;
         error?: string;
-        }) => {
+      }) => {
         if (data.status === 'running') {
-            setRunningSequenceId(data.sequenceId);
-            setActiveStepIndex(data.stepIndex);
+          setRunningSequenceId(data.sequenceId);
+          if (data.stepIndex !== null) setActiveStepIndex(data.stepIndex);
+
         } else if (data.status === 'completed') {
-            setRunningSequenceId(null);
-            setActiveStepIndex(null);
-            fetchAutomationData();
-            setToastMessage(`🎯 [스케줄 자동 실행] 파이프라인이 성공적으로 완료되었습니다.`);
-            setTimeout(() => setToastMessage(null), 3500);
+          setRunningSequenceId(null);
+          setActiveStepIndex(null);
+          setFailedStepIndex(null);
+          setFailedError(null); 
+          
+          setFailedSequenceIds(prev => { const s = new Set(prev); s.delete(data.sequenceId); return s; });
+          setCompletedSequenceIds(prev => new Set([...prev, data.sequenceId]));
+          
+          setTimeout(() => {
+            setCompletedSequenceIds(prev => { const s = new Set(prev); s.delete(data.sequenceId); return s; });
+          }, 2000);
+
+          fetchAutomationData();
+          setToastMessage(`🎯 파이프라인이 전 과정 무결하게 처리 완료되었습니다.`);
+          setTimeout(() => setToastMessage(null), 3000);
+
         } else if (data.status === 'failed') {
-            setRunningSequenceId(null);
-            setActiveStepIndex(null);
-            fetchAutomationData();
-            setToastMessage(`❌ [스케줄 실행 실패] ${data.error}`);
-            setTimeout(() => setToastMessage(null), 4000);
+          setRunningSequenceId(null);
+          setActiveStepIndex(null);
+          setFailedStepIndex(data.stepIndex ?? null);
+          setFailedError(data.error ?? null);
+          setFailedSequenceIds(prev => new Set([...prev, data.sequenceId]));
+          fetchAutomationData();
+          setToastMessage(`❌ [런타임 크래시] ${data.error}`);
+          setTimeout(() => setToastMessage(null), 4000);
         }
-        });
+      });
     }
 
     const handleOutsideClick = (e: MouseEvent) => {
         if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpenSeqId(null);
+          setMenuOpenSeqId(null);
         }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -145,15 +183,15 @@ export default function AutomationView() {
         document.removeEventListener('mousedown', handleOutsideClick);
         window.electronAPI.offSequenceStatus?.();
     };
-}, []);
+  }, []);
 
   const filteredTools = activePluginFilter === 'all' 
     ? availableTools 
     : availableTools.filter(t => t.pluginId === activePluginFilter);
 
   const triggerHelpToast = () => {
-    setToastMessage("변수 체이닝 가이드: 앞선 스텝의 결과물은 {{step_0.output}} 마커를 하위 스텝의 인자에 포워딩하여 결합할 수 있습니다.");
-    setTimeout(() => setToastMessage(null), 4000);
+    setToastMessage("변수 체이닝 가이드: {{variables.내변수}} 구조 또는 앞선 스텝의 결과물 마커 {{step_0.output}}를 기입하여 런타임에 인라인 치환 주입할 수 있습니다.");
+    setTimeout(() => setToastMessage(null), 5000);
   };
 
   const handleDropOnBoard = (e: React.DragEvent) => {
@@ -161,7 +199,7 @@ export default function AutomationView() {
     if (!draggingTool) return;
 
     const defaultSchema = draggingTool.name === 'ai__ask_llm'
-      ? '{\n  "prompt": "여기에 프롬프트를 입력하세요.\\n\\n이전 데이터: {{step_0.output}}"\n}'
+      ? '{\n  "prompt": "여기에 프롬프트를 입력하세요.\\n\\n변수 연동: {{variables.my_var}}\\n이전 데이터: {{step_0.output}}"\n}'
       : JSON.stringify(Object.keys(draggingTool.input_schema.properties || {}).reduce((acc: any, key) => { acc[key] = "값 기입"; return acc; }, {}), null, 2);
 
     const newStep: SelectedStep = {
@@ -178,19 +216,34 @@ export default function AutomationView() {
   const handleRemoveStep = (id: string) => { setSteps(steps.filter(s => s.id !== id)); };
   const handleStepArgsChange = (id: string, newValue: string) => { setSteps(steps.map(s => s.id === id ? { ...s, argsTemplate: newValue } : s)); };
 
+  const toggleStepCollapse = (id: string) => {
+    setCollapsedSteps(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // 💡 커스텀 변수 처리 핸들러 모음
+  const handleAddVariable = () => {
+    setVariables(prev => [...prev, { key: 'new_variable', value: '값 기입' }]);
+  };
+  const handleUpdateVariable = (index: number, field: 'key' | 'value', value: string) => {
+    setVariables(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+  };
+  const handleRemoveVariable = (index: number) => {
+    setVariables(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleToggleSequenceEnable = async (seq: SavedSequence) => {
+    if (completedSequenceIds.has(seq.id) || runningSequenceId === seq.id) return;
+
     const nextStatus = !seq.isEnabled;
+    setFailedSequenceIds(prev => { const s = new Set(prev); s.delete(seq.id); return s; });
+    setSavedSequences(prev => prev.map(s => s.id === seq.id ? { ...s, isEnabled: nextStatus } : s));
 
-    // ✅ 클릭 즉시 로컬 상태 선 반영 (Optimistic Update)
-    setSavedSequences(prev =>
-        prev.map(s => s.id === seq.id ? { ...s, isEnabled: nextStatus } : s)
-    );
-
-    if (!window.electronAPI.toggleSequenceStatus) {
-        // preload에 메서드가 없으면 로컬 상태만 토글된 채로 유지
-        console.warn('toggleSequenceStatus IPC 메서드가 preload에 노출되지 않았습니다.');
-        return;
-    }
+    if (!window.electronAPI.toggleSequenceStatus) return;
 
     const res = await window.electronAPI.toggleSequenceStatus({
         sequenceId: seq.id,
@@ -198,17 +251,13 @@ export default function AutomationView() {
     });
 
     if (res && res.success) {
-        // DB 실제값으로 최종 동기화
         await fetchAutomationData();
     } else {
-        // ❌ 실패 시 원래 상태로 롤백
-        setSavedSequences(prev =>
-        prev.map(s => s.id === seq.id ? { ...s, isEnabled: seq.isEnabled } : s)
-        );
-        setToastMessage(`상태 업데이트 실패: ${res?.error}`);
+        setSavedSequences(prev => prev.map(s => s.id === seq.id ? { ...s, isEnabled: seq.isEnabled } : s));
+        setToastMessage(`❌ 상태 업데이트 실패: ${res?.error}`);
         setTimeout(() => setToastMessage(null), 3000);
     }
-    };
+  };
 
   const handleInspectSequenceGraph = (seq: SavedSequence) => {
     setEditingSequenceId(seq.id);
@@ -216,6 +265,7 @@ export default function AutomationView() {
     setSequenceDesc(seq.description);
     setCronExpr(seq.cronExpression || '0 3 * * *'); 
     setSteps(seq.steps || []); 
+    setVariables(seq.variables || []); // 💡 보관된 변수 레이어 디코딩
     setIsModalOpen(true);
     setMenuOpenSeqId(null);
   };
@@ -226,8 +276,13 @@ export default function AutomationView() {
   };
 
   const handleTriggerConfirmModal = (seq: SavedSequence) => {
+    if (runningSequenceId !== null || completedSequenceIds.has(seq.id)) {
+      setToastMessage('⚠️ 가동 중이거나 완료 공정 락이 걸린 파이프라인이 존재합니다.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
     if (!seq.isEnabled) {
-      setToastMessage("비활성화된 시퀀스는 즉시 가동할 수 없습니다. 카드를 클릭하여 먼저 활성화하세요.");
+      setToastMessage('비활성화된 시퀀스는 즉시 가동할 수 없습니다.');
       setTimeout(() => setToastMessage(null), 3500);
       return;
     }
@@ -239,37 +294,26 @@ export default function AutomationView() {
     const seq = confirmModalTarget;
     setConfirmModalTarget(null);
 
+    setFailedSequenceIds(prev => { const s = new Set(prev); s.delete(seq.id); return s; });
     setRunningSequenceId(seq.id);
-    setActiveStepIndex(0);
+    setActiveStepIndex(null); 
     handleInspectSequenceGraph(seq);
 
-    try {
-        if (window.electronAPI.triggerSequenceNow) {
-        const totalSteps = seq.steps?.length || 0;
-        for (let i = 0; i < totalSteps; i++) {
-            setActiveStepIndex(i);
-            await new Promise(resolve => setTimeout(resolve, 800));
-        }
-
-        const res = await window.electronAPI.triggerSequenceNow(seq.id);
-        await fetchAutomationData();
-
-        if (res && res.success) {
-            setToastMessage(`🎯 [${seq.name}] 파이프라인 관제 공정이 안전하게 완료되었습니다.`);
-            setTimeout(() => setToastMessage(null), 3500);
-        } else {
-            setToastMessage(`❌ 가동 도중 에러 감지: ${res.error}`);
-            setTimeout(() => setToastMessage(null), 4000);
-        }
-        }
-    } finally {
-        // ✅ 성공/실패 무관하게 항상 running 상태 초기화 (stale closure 없음)
+    if (window.electronAPI.triggerSequenceNow) {
+      const res = await window.electronAPI.triggerSequenceNow(seq.id);
+      if (!res || !res.success) {
         setRunningSequenceId(null);
         setActiveStepIndex(null);
+        setFailedSequenceIds(prev => new Set([...prev, seq.id]));
+        setToastMessage(`❌ 가동 실패: ${res?.error}`);
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+      await fetchAutomationData();
     }
-    };
+  };
 
   const handleTriggerDeleteModal = (seq: SavedSequence) => {
+    if (runningSequenceId === seq.id || completedSequenceIds.has(seq.id)) return;
     setDeleteModalTarget(seq);
     setMenuOpenSeqId(null);
   };
@@ -287,14 +331,15 @@ export default function AutomationView() {
     }
   };
 
-    const closeModal = () => {
-        setEditingSequenceId(null); 
-        setSequenceName(''); 
-        setSequenceDesc(''); 
-        setSteps([]);
-        setIsModalOpen(false);
-        // ✅ runningSequenceId는 건드리지 않음 — 실행이 끝나면 자연히 초기화됨
-    };
+  const closeModal = () => {
+    setEditingSequenceId(null); 
+    setSequenceName(''); 
+    setSequenceDesc(''); 
+    setSteps([]);
+    setVariables([]);
+    setCollapsedSteps(new Set());
+    setIsModalOpen(false);
+  };
 
   const handleSaveAutomationPipeline = async () => {
     if (!sequenceName.trim() || steps.length === 0) {
@@ -323,7 +368,8 @@ export default function AutomationView() {
       description: sequenceDesc.trim(),
       cronExpression: cronExpr.trim(),
       isEnabled: true, 
-      steps: formattedSteps
+      steps: formattedSteps,
+      variables // 💡 백엔드 스케줄러 링크로 변수 바인딩 주입
     };
 
     if (window.electronAPI.saveAutomationSequence) {
@@ -353,7 +399,7 @@ export default function AutomationView() {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', height: '100%', overflowY: 'auto', boxSizing: 'border-box', color: 'var(--color-text-main)' }}>
       <style>{`
         @keyframes mcp-network-pulse {
           0% { transform: scale(0.95); opacity: 0.5; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
@@ -365,12 +411,14 @@ export default function AutomationView() {
           70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
           100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
-        .pulse-active-dot {
-          animation: pulse-green 1.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        @keyframes pulse-emerald {
+          0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+          50% { transform: scale(1.03); box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.4); }
+          100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
-        .pulse-running-badge {
-          animation: mcp-network-pulse 1.5s infinite;
-        }
+        .pulse-active-dot { animation: pulse-green 1.4s infinite cubic-bezier(0.4, 0, 0.6, 1); }
+        .pulse-running-badge { animation: mcp-network-pulse 1.5s infinite; }
+        .pulse-completed-badge { animation: pulse-emerald 1.2s infinite; }
       `}</style>
       
       {/* 플로팅 헬프 토스트 */}
@@ -384,7 +432,7 @@ export default function AutomationView() {
         )}
       </AnimatePresence>
 
-      {/* 실행 제어 전용 커스텀 글래스모피즘 컨펌 팝업 */}
+      {/* 실행 제어 전용 커스텀 컨펌 팝업 */}
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {confirmModalTarget && (
@@ -407,7 +455,7 @@ export default function AutomationView() {
         document.body
       )}
 
-      {/* 소거 삭제 전용 커스텀 글래스모피즘 컨펌 팝업 */}
+      {/* 소거 삭제 전용 커스텀 컨펌 팝업 */}
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {deleteModalTarget && (
@@ -446,131 +494,152 @@ export default function AutomationView() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', width: '100%' }}>
               {savedSequences.map((seq) => {
                 const isCurrentRunning = runningSequenceId === seq.id;
-                const isEnabled = !!seq.isEnabled;
-                
-                // 💡 [해결] 비활성화(off) 상태일 때 가이드라인 색상을 물리적으로 도려내고 투명한 유리 회색선으로 고정
+                const isCurrentFailed = failedSequenceIds.has(seq.id);
+                const isCurrentCompleted = completedSequenceIds.has(seq.id);
+                const isEnabled = seq.isEnabled !== false && (seq.isEnabled as any) !== 0 && (seq as any).isEnabled !== '0';
+  
                 const getCardBorderColor = () => {
-                  if (!isEnabled) return 'rgba(128, 128, 128, 0.12)'; 
-                  return isCurrentRunning ? '#3b82f6' : '#10b981';
+                  if (!isEnabled) return 'rgba(128, 128, 128, 0.15)'; 
+                  if (isCurrentFailed) return '#ef4444';
+                  if (isCurrentRunning) return '#3b82f6';
+                  if (isCurrentCompleted) return '#10b981'; 
+                  return '#f59e0b'; 
                 };
 
                 return (
-                <div 
+                  <div 
                     key={seq.id} 
                     onClick={() => handleToggleSequenceEnable(seq)} 
                     onMouseEnter={() => setHoveredCardId(seq.id)}
                     onMouseLeave={() => setHoveredCardId(null)}
                     style={{ 
-                    background: isEnabled 
-                        ? (isCurrentRunning ? 'rgba(59, 130, 246, 0.04)' : 'rgba(16, 185, 129, 0.04)') 
-                        : 'var(--bg-glass-card)',
-                    border: `1px solid ${getCardBorderColor()}`, 
-                    borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', 
-                    gap: '10px', position: 'relative', height: '145px', boxSizing: 'border-box', cursor: 'pointer',
-                    opacity: isEnabled ? 1 : 0.52,
-                    transition: 'border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, opacity 0.2s ease',
+                      background: isEnabled 
+                        ? isCurrentRunning ? 'rgba(59, 130, 246, 0.04)'
+                          : isCurrentFailed ? 'rgba(239, 68, 68, 0.04)'
+                          : isCurrentCompleted ? 'rgba(16, 185, 129, 0.06)'
+                          : 'rgba(245, 158, 11, 0.02)'
+                        : 'var(--bg-glass-card)', 
+                      border: `1px solid ${getCardBorderColor()}`, 
+                      borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', height: '145px', boxSizing: 'border-box', cursor: (isCurrentRunning || isCurrentCompleted) ? 'not-allowed' : 'pointer',
+                      opacity: isEnabled ? 1 : 0.42, 
+                      transition: 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
+                      filter: isEnabled ? 'none' : 'grayscale(100%) brightness(0.9)', 
                     }}
-                >
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '65%' }}>
-                        <span style={{ color: isEnabled ? (isCurrentRunning ? '#3b82f6' : '#10b981') : 'var(--color-text-muted)', display: 'flex', alignItems: 'center', opacity: isEnabled ? 1 : 0.4 }}>
-                        <Icon.Network />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '65%' }}>
+                        <span style={{ color: isEnabled ? (isCurrentRunning ? '#3b82f6' : '#10b981') : 'var(--color-text-muted)', display: 'flex', alignItems: 'center', opacity: isEnabled ? 1 : 0.35 }}>
+                          <Icon.Network />
                         </span>
                         
-                        {isEnabled && (
-                        <span style={{ 
-                            width: '6px', height: '6px', borderRadius: '50%', 
-                            backgroundColor: '#10b981',
-                            boxShadow: '0 0 5px #10b981'
-                        }} />
+                        {isEnabled && !isCurrentFailed && !isCurrentCompleted && (
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 5px #10b981' }} />
+                        )}
+
+                        {isCurrentFailed && (
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 5px #ef4444' }} />
+                        )}
+
+                        {isCurrentCompleted && (
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }} className="pulse-active-dot" />
                         )}
 
                         {isCurrentRunning && (
-                        <span style={{
-                            width: '6px', height: '6px', borderRadius: '50%',
-                            backgroundColor: '#3b82f6',
-                            boxShadow: '0 0 5px #3b82f6',
-                            marginLeft: '-2px',
-                            animation: 'mcp-network-pulse 1.5s infinite' 
-                        }} className="pulse-active-dot" />
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', boxShadow: '0 0 5px #3b82f6', marginLeft: '-2px' }} className="pulse-active-dot" />
                         )}
                         
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-main)', opacity: isEnabled ? 1 : 0.6 }}>
-                        {seq.name}
-                        </span>
-                    </div>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-main)', opacity: isEnabled ? 1 : 0.55 }}>{seq.name}</span>
+                      </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                         <span style={{
-                        ...baseBadgeStyle,
-                        backgroundColor: isCurrentRunning ? '#3b82f6' : (isEnabled ? '#10b981' : 'rgba(128, 128, 128, 0.15)'), 
-                        boxShadow: isEnabled ? (isCurrentRunning ? '0 2px 6px rgba(59,130,246,0.3)' : '0 2px 6px rgba(16,185,129,0.3)') : 'none',
-                        color: isEnabled ? '#fff' : 'var(--color-text-muted)',
-                        opacity: isEnabled ? 1 : 0.5
-                        }} className={isCurrentRunning ? "pulse-running-badge" : ""}>
-                        {isCurrentRunning ? "running" : (isEnabled ? "ready" : "off")}
+                          ...baseBadgeStyle,
+                          backgroundColor: isCurrentRunning ? '#3b82f6'
+                            : isCurrentFailed ? '#ef4444'
+                            : isCurrentCompleted ? '#10b981' 
+                            : isEnabled ? '#f59e0b'
+                            : 'rgba(128, 128, 128, 0.15)',
+                          boxShadow: isCurrentFailed ? '0 2px 6px rgba(239,68,68,0.3)'
+                            : isCurrentCompleted ? '0 2px 8px rgba(16,185,129,0.4)'
+                            : isEnabled ? (isCurrentRunning ? '0 2px 6px rgba(59,130,246,0.3)' : '0 2px 6px rgba(245,158,11,0.3)') : 'none',
+                          color: isEnabled ? '#fff' : 'var(--color-text-muted)',
+                          opacity: isEnabled ? 1 : 0.6
+                        }} className={isCurrentRunning ? "pulse-running-badge" : isCurrentCompleted ? "pulse-completed-badge" : ""}>
+                          {isCurrentRunning ? "running" : isCurrentFailed ? "failed" : isCurrentCompleted ? "completed" : isEnabled ? "ready" : "off"}
                         </span>
 
                         <span style={{ ...baseBadgeStyle, fontFamily: 'monospace', color: 'var(--color-text-muted)', backgroundColor: 'rgba(128, 128, 128, 0.06)', border: '1px solid rgba(128, 128, 128, 0.15)', opacity: isEnabled ? 1 : 0.4 }}>
-                        {seq.cronExpression}
+                          {seq.cronExpression}
                         </span>
-                    </div>
+                      </div>
                     </div>
                     
-                    <div style={{ flexGrow: 1, fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', opacity: isEnabled ? 1 : 0.5 }}>
-                    {seq.description || "상세 기술 명세가 정의되지 않은 워크플로우"}
-                    </div>
+                    <div style={{ flexGrow: 1, fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', opacity: isEnabled ? 1 : 0.5 }}>{seq.description || "상세 기술 명세가 정의되지 않은 워크플로우"}</div>
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '6px', marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', opacity: isEnabled ? 1 : 0.5 }}>
-                        Last: {seq.lastRunTimestamp ? new Date(seq.lastRunTimestamp).toLocaleTimeString() : "Never"}
-                    </span>
-                    
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', opacity: isEnabled ? 1 : 0.4 }}>Last: {seq.lastRunTimestamp ? new Date(seq.lastRunTimestamp).toLocaleTimeString() : "Never"}</span>
+                      
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         <button 
-                        onClick={() => handleTriggerConfirmModal(seq)} 
-                        disabled={!isEnabled} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 10px', background: isEnabled ? '#10b981' : 'rgba(128,128,128,0.06)', color: isEnabled ? '#fff' : 'var(--color-text-muted)', border: 'none', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 700, cursor: isEnabled ? 'pointer' : 'not-allowed', opacity: isEnabled ? 1 : 0.4 }}
+                          onClick={() => handleTriggerConfirmModal(seq)} 
+                          disabled={!isEnabled || isCurrentRunning || isCurrentCompleted} 
+                          style={{ 
+                            display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 10px', 
+                            background: (isCurrentRunning || isCurrentCompleted) ? 'rgba(128,128,128,0.06)' : isEnabled ? '#10b981' : 'rgba(128,128,128,0.06)', 
+                            color: (isCurrentRunning || isCurrentCompleted) ? 'var(--color-text-muted)' : isEnabled ? '#fff' : 'var(--color-text-muted)', 
+                            border: 'none', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 700, 
+                            cursor: (isEnabled && !isCurrentRunning && !isCurrentCompleted) ? 'pointer' : 'not-allowed', 
+                            opacity: isEnabled && !isCurrentRunning && !isCurrentCompleted ? 1 : 0.4 
+                          }}
                         >
-                        <Icon.Play /> 실행
+                          <Icon.Play /> 실행
                         </button>
                         
                         <button 
-                        onClick={(e) => handleOpenMenu(e, seq.id)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          onClick={(e) => handleOpenMenu(e, seq.id)}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)')}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
-                        <Icon.More />
+                          <Icon.More />
                         </button>
-                    </div>
+                      </div>
                     </div>
 
+                    {/* 더보기 서브 버블 */}
                     {menuOpenSeqId === seq.id && (
-                    <div 
+                      <div 
                         ref={menuRef}
                         style={{ position: 'absolute', bottom: '36px', right: '16px', backgroundColor: 'var(--bg-modal)', border: 'var(--border-glass)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', padding: '4px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '2px', width: '150px' }}
                         onClick={e => e.stopPropagation()}
-                    >
+                      >
                         <button 
-                        onClick={() => handleInspectSequenceGraph(seq)} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', border: 'none', background: 'transparent', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--color-text-main)', cursor: 'pointer', textAlign: 'left', width: '100%' }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          onClick={() => handleInspectSequenceGraph(seq)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', border: 'none', background: 'transparent', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--color-text-main)', cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'}
+                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                        <Icon.Edit /> 명세 수정 및 모니터링
+                          <Icon.Edit /> 명세 수정 및 모니터링
                         </button>
                         <button 
-                        onClick={() => handleTriggerDeleteModal(seq)} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', border: 'none', background: 'transparent', borderRadius: '6px', fontSize: '0.75rem', color: '#ef4444', cursor: 'pointer', textAlign: 'left', width: '100%' }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.06)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          onClick={() => handleTriggerDeleteModal(seq)} 
+                          disabled={isCurrentRunning || isCurrentCompleted}
+                          style={{ 
+                            display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', border: 'none', 
+                            background: 'transparent', borderRadius: '6px', fontSize: '0.75rem', 
+                            color: (isCurrentRunning || isCurrentCompleted) ? 'var(--color-text-muted)' : '#ef4444', 
+                            cursor: (isCurrentRunning || isCurrentCompleted) ? 'not-allowed' : 'pointer', 
+                            textAlign: 'left', width: '100%',
+                            opacity: (isCurrentRunning || isCurrentCompleted) ? 0.4 : 1
+                          }}
+                          onMouseEnter={e => !(isCurrentRunning || isCurrentCompleted) && (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.06)')}
+                          onMouseLeave={e => !(isCurrentRunning || isCurrentCompleted) && (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
-                        <Icon.Trash /> 삭제하기
+                          <Icon.Trash /> 삭제하기
                         </button>
-                    </div>
+                      </div>
                     )}
-                </div>
+                  </div>
                 );
               })}
             </div>
@@ -585,15 +654,51 @@ export default function AutomationView() {
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }} onClick={closeModal}>
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} onClick={e => e.stopPropagation()} style={{ width: '90vw', maxWidth: '1140px', height: '84vh', maxHeight: '720px', background: 'var(--bg-modal)', border: 'var(--border-glass)', boxShadow: '0 30px 80px rgba(0, 0, 0, 0.4)', borderRadius: '20px', display: 'flex', flexDirection: 'column', padding: '20px', boxSizing: 'border-box', gap: '14px', overflow: 'hidden' }}>
                 
-                {/* 상단 툴바 헤더 */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '10px', flexShrink: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', color: '#2563eb' }}>
                       {editingSequenceId ? <Icon.Pin /> : <Icon.Gear />}
                     </div>
                     <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>
                       {editingSequenceId ? (runningSequenceId === editingSequenceId ? "Live Pipeline Tracking" : "Edit Automation Graph") : "Create Automation Pipeline"}
                     </h2>
+                    
+                    {editingSequenceId && (() => {
+                      const currentSeq = savedSequences.find(s => s.id === editingSequenceId);
+                      const isRunning = runningSequenceId === editingSequenceId;
+                      const isCompleted = completedSequenceIds.has(editingSequenceId);
+                      const isLockActive = isRunning || isCompleted;
+
+                      return (
+                        <button
+                          onClick={() => {
+                            if (isLockActive) return; 
+                            currentSeq && handleTriggerConfirmModal(currentSeq);
+                          }}
+                          disabled={isLockActive || !currentSeq?.isEnabled}
+                          style={{
+                            padding: '5px 14px', borderRadius: '6px', border: 'none',
+                            background: isRunning ? 'rgba(59, 130, 246, 0.15)'
+                              : isCompleted ? 'rgba(16, 185, 129, 0.15)'
+                              : currentSeq?.isEnabled ? '#10b981' : 'rgba(128,128,128,0.1)',
+                            color: isRunning ? '#3b82f6' : isCompleted ? '#10b981'
+                              : currentSeq?.isEnabled ? '#fff' : 'var(--color-text-muted)',
+                            fontSize: '0.78rem', fontWeight: 700,
+                            cursor: (isLockActive || !currentSeq?.isEnabled) ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '6px', height: '28px', boxSizing: 'border-box'
+                          }}
+                        >
+                          {isRunning ? (
+                            <><span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6' }} className="pulse-active-dot" /> 가동중</>
+                          ) : isCompleted ? (
+                            <><span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} /> 완료됨</>
+                          ) : (
+                            <><Icon.Play /> 실행</>
+                          )}
+                        </button>
+                      );
+                    })()}
+
                     <button onClick={triggerHelpToast} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}><Icon.Help /></button>
                   </div>
                   <button onClick={closeModal} style={{ background: 'rgba(128,128,128,0.1)', border: 'none', padding: '6px', borderRadius: '50%', color: 'var(--color-text-main)', cursor: 'pointer' }}><Icon.Close /></button>
@@ -611,9 +716,14 @@ export default function AutomationView() {
 
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '2px' }}>
                       {filteredTools.map((tool) => (
-                        <motion.div key={tool.name} draggable onDragStart={() => setDraggingTool(tool)} whileHover={{ x: 2 }} style={{ padding: '8px 10px', borderRadius: '8px', background: tool.name === 'ai__ask_llm' ? 'rgba(37,99,235,0.08)' : 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.08)', cursor: 'grab', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                          {tool.name === 'ai__ask_llm' && <Icon.Cpu />}
-                          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: tool.name === 'ai__ask_llm' ? '#2563eb' : 'inherit' }}>{tool.name.includes('__') ? tool.name.split('__')[1] : tool.name}</div>
+                        <motion.div key={tool.name} draggable onDragStart={() => setDraggingTool(tool)} whileHover={{ x: 2 }} style={{ padding: '8px 10px', borderRadius: '8px', background: tool.name === 'ai__ask_llm' ? 'rgba(37,99,235,0.08)' : 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.08)', cursor: 'grab', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                            {tool.name === 'ai__ask_llm' && <Icon.Cpu />}
+                            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: tool.name === 'ai__ask_llm' ? '#2563eb' : 'inherit' }}>{tool.name.includes('__') ? tool.name.split('__')[1] : tool.name}</div>
+                          </div>
+                          {tool.description && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tool.description}</div>
+                          )}
                         </motion.div>
                       ))}
                     </div>
@@ -622,42 +732,44 @@ export default function AutomationView() {
                   {/* 우측 실시간 파이프라인 관제 그래프 존 */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', height: '100%', minWidth: 0 }}>
                     
+                    {/* 상단 뼈대 설정 바 */}
                     <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-glass-card)', border: 'var(--border-glass)', borderRadius: '12px', padding: '10px', flexShrink: 0 }}>
-                        <input type="text" value={sequenceName} onChange={e => setSequenceName(e.target.value)} placeholder="시퀀스 명칭" style={{ flex: 1.5, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontSize: '0.78rem', outline: 'none', minWidth: 0 }} />
-                        <input type="text" value={sequenceDesc} onChange={e => setSequenceDesc(e.target.value)} placeholder="설명문" style={{ flex: 2, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontSize: '0.78rem', outline: 'none', minWidth: 0 }} />
-                        <input type="text" value={cronExpr} onChange={e => setCronExpr(e.target.value)} placeholder="Cron (e.g. 0 3 * * *)" style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontSize: '0.78rem', fontFamily: 'monospace', outline: 'none', minWidth: 0 }} />
-                        
-                        <button onClick={handleSaveAutomationPipeline} disabled={steps.length === 0} style={{ padding: '0 16px', borderRadius: '6px', border: 'none', background: '#2563eb', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', opacity: steps.length > 0 ? 1 : 0.5, flexShrink: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Icon.Target /> {editingSequenceId ? "명세 변경 저장" : "새 저장"}</div>
-                        </button>
-
-                        {/* ✅ 편집 모드일 때만 실행 버튼 노출 */}
-                        {editingSequenceId && (() => {
-                            const currentSeq = savedSequences.find(s => s.id === editingSequenceId);
-                            const isRunning = runningSequenceId === editingSequenceId;
-                            return (
-                            <button
-                                onClick={() => currentSeq && handleTriggerConfirmModal(currentSeq)}
-                                disabled={!currentSeq || !currentSeq.isEnabled || isRunning}
-                                style={{
-                                padding: '0 14px', borderRadius: '6px', border: 'none',
-                                background: isRunning ? 'rgba(16,185,129,0.15)' : '#10b981',
-                                color: isRunning ? '#10b981' : '#fff',
-                                fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
-                                opacity: currentSeq?.isEnabled ? 1 : 0.4,
-                                flexShrink: 0,
-                                display: 'flex', alignItems: 'center', gap: '4px'
-                                }}
-                            >
-                                {isRunning
-                                ? <><span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', animation: 'pulse-green 1.4s infinite' }} /> Running</>
-                                : <><Icon.Play /> 실행</>
-                                }
-                            </button>
-                            );
-                        })()}
+                      <input type="text" value={sequenceName} onChange={e => setSequenceName(e.target.value)} placeholder="시퀀스 명칭" style={{ flex: 1.5, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontSize: '0.78rem', outline: 'none', minWidth: 0 }} />
+                      <input type="text" value={sequenceDesc} onChange={e => setSequenceDesc(e.target.value)} placeholder="설명문" style={{ flex: 2, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontSize: '0.78rem', outline: 'none', minWidth: 0 }} />
+                      <input type="text" value={cronExpr} onChange={e => setCronExpr(e.target.value)} placeholder="Cron (e.g. 0 3 * * *)" style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontSize: '0.78rem', fontFamily: 'monospace', outline: 'none', minWidth: 0 }} />
+                      <button onClick={handleSaveAutomationPipeline} disabled={steps.length === 0} style={{ padding: '0 16px', borderRadius: '6px', border: 'none', background: '#2563eb', color: '#fff', fontSize: '#0.78rem', fontWeight: 700, cursor: 'pointer', opacity: steps.length > 0 ? 1 : 0.5, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Icon.Target /> {editingSequenceId ? "명세 변경 저장" : "새 저장"}</div>
+                      </button>
                     </div>
 
+                    {/* 💡 [신설] 시퀀스 글로벌 변수 관리 가변 레이어 단추 컴포넌트 */}
+                    <div style={{ background: 'var(--bg-glass-card)', border: 'var(--border-glass)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.03em' }}>⚡ 글로벌 파이프라인 가변 변수 (Variables)</span>
+                        <button onClick={handleAddVariable} style={{ border: 'none', background: 'rgba(37,99,235,0.1)', color: '#2563eb', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <Icon.Plus /> 변수 추가
+                        </button>
+                      </div>
+                      
+                      {variables.length === 0 ? (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>등록된 고유 가변인자가 없습니다. 각 스텝에서 `{"{{variables.변수명}} "}` 마커로 치환 연동이 지원됩니다.</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '72px', overflowY: 'auto', paddingRight: '4px' }}>
+                          {variables.map((variable, vIdx) => (
+                            <div key={vIdx} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-glass-input)', borderRadius: '6px', padding: '2px 6px' }}>
+                              <input type="text" value={variable.key} onChange={e => handleUpdateVariable(vIdx, 'key', e.target.value)} placeholder="변수명" style={{ border: 'none', background: 'transparent', color: '#2563eb', fontWeight: 700, fontSize: '0.72rem', width: '80px', outline: 'none' }} />
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>:</span>
+                              <input type="text" value={variable.value} onChange={e => handleUpdateVariable(vIdx, 'value', e.target.value)} placeholder="기본값" style={{ border: 'none', background: 'transparent', color: 'inherit', fontSize: '0.72rem', width: '100px', outline: 'none' }} />
+                              <button onClick={() => handleRemoveVariable(vIdx)} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 2px' }}>
+                                <Icon.Trash />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 실시간 드롭 보드 그래프 메인 스페이스 */}
                     <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropOnBoard} style={{ flex: 1, borderRadius: '14px', background: draggingTool ? 'rgba(37, 99, 235, 0.03)' : 'rgba(128,128,128,0.01)', border: draggingTool ? '2px dashed #2563eb' : '1px dashed var(--border-glass-input)', padding: '12px', overflowY: 'auto', minHeight: 0 }}>
                       {steps.length === 0 ? (
                         <div style={{ display: 'flex', width: '100%', height: '100%', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
@@ -668,13 +780,17 @@ export default function AutomationView() {
                           <AnimatePresence initial={false}>
                             {steps.map((step, index) => {
                               const isStepRunning = runningSequenceId === editingSequenceId && activeStepIndex === index;
-                              const isStepPassed = runningSequenceId === editingSequenceId && activeStepIndex! > index;
+                              const isStepPassed = runningSequenceId === editingSequenceId && activeStepIndex !== null && activeStepIndex > index;
+                              const isStepFailed = failedSequenceIds.has(editingSequenceId ?? '') && failedStepIndex === index;
+                              const isCollapsed = collapsedSteps.has(step.id);
+                              
+                              const matchingToolInfo = availableTools.find(t => t.name === step.fullToolName);
 
                               return (
                                 <React.Fragment key={step.id}>
                                   {index > 0 && (
                                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '22px', margin: '2px 0', flexShrink: 0 }}>
-                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isStepPassed || isStepRunning ? "#10b981" : "#2563eb"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke 0.3s ease' }}><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                                      <Icon.FlowDown />
                                     </div>
                                   )}
                                   
@@ -683,25 +799,33 @@ export default function AutomationView() {
                                     value={step} 
                                     whileDrag={{ scale: 0.99 }} 
                                     style={{ 
-                                      display: 'flex', flexDirection: 'column', gap: '6px', 
+                                      position: 'relative',
+                                      display: 'flex', flexDirection: 'column', gap: isCollapsed ? '0px' : '6px', 
                                       background: 'var(--bg-glass-card)', 
-                                      border: isStepRunning 
-                                        ? '1.5px solid #10b981' 
-                                        : isStepPassed 
-                                          ? '1px solid rgba(16, 185, 129, 0.4)'
-                                          : step.fullToolName === 'ai__ask_llm' 
-                                            ? '1px solid rgba(37,99,235,0.3)' 
-                                            : 'var(--border-glass)', 
+                                      border: isStepRunning ? '1.5px solid #10b981'
+                                        : isStepFailed ? '1.5px solid #ef4444'
+                                        : isStepPassed ? '1px solid rgba(16, 185, 129, 0.4)'
+                                        : step.fullToolName === 'ai__ask_llm' ? '1px solid rgba(37,99,235,0.3)' : 'var(--border-glass)', 
                                       borderRadius: '12px', padding: '10px 14px', cursor: 'grab', 
-                                      boxShadow: isStepRunning ? '0 0 15px rgba(16, 185, 129, 0.15)' : '0 2px 8px rgba(0,0,0,0.02)', 
+                                      boxShadow: isStepRunning ? '0 0 15px rgba(16, 185, 129, 0.15)'
+                                        : isStepFailed ? '0 0 15px rgba(239, 68, 68, 0.15)' : '0 2px 8px rgba(0,0,0,0.02)', 
                                       flexShrink: 0,
-                                      transition: 'border-color 0.3s ease, box-shadow 0.3s ease'
+                                      transition: 'border-color 0.3s ease, box-shadow 0.3s ease, gap 0.2s ease'
                                     }}
                                   >
+                                    {isStepFailed && tooltipStepId === step.id && failedError && (
+                                      <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: '0', right: '0', background: 'rgba(30, 15, 15, 0.96)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '8px 12px', fontSize: '0.74rem', color: '#fca5a5', lineHeight: '1.45', zIndex: 200, backdropFilter: 'blur(8px)', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-start', gap: '6px', pointerEvents: 'none' }}>
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: '1px' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                        <span>{failedError}</span>
+                                      </div>
+                                    )}
+                                    
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isStepRunning ? '#10b981' : step.fullToolName === 'ai__ask_llm' ? '#2563eb' : 'var(--color-text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isStepRunning ? '#10b981' : isStepFailed ? '#ef4444' : step.fullToolName === 'ai__ask_llm' ? '#2563eb' : 'var(--color-text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         
-                                        {isStepRunning ? (
+                                        {isStepFailed ? (
+                                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444', marginRight: '4px' }} />
+                                        ) : isStepRunning ? (
                                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 6px #10b981', marginRight: '4px' }} className="pulse-active-dot" />
                                         ) : isStepPassed ? (
                                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', marginRight: '4px' }} />
@@ -711,9 +835,48 @@ export default function AutomationView() {
                                         [Node {index}] {step.fullToolName.includes('__') ? step.fullToolName.split('__')[1] : step.fullToolName}
                                         <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>({step.pluginId})</span>
                                       </div>
-                                      <button onClick={() => handleRemoveStep(step.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}><Icon.AlertCircle />삭제</button>
+                                      
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} onClick={e => e.stopPropagation()}>
+                                        {/* 💡 [신설] V 모양 가변 접기/펼치기 폴딩 컴포넌트 단추 배치 */}
+                                        <button 
+                                          onClick={() => toggleStepCollapse(step.id)}
+                                          style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '4px' }}
+                                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'}
+                                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                        >
+                                          {isCollapsed ? <Icon.ArrowDown /> : <Icon.ArrowUp />}
+                                        </button>
+                                        
+                                        <button onClick={() => handleRemoveStep(step.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                                          <Icon.AlertCircle />삭제
+                                        </button>
+                                      </div>
                                     </div>
-                                    <textarea value={step.argsTemplate} onChange={e => handleStepArgsChange(step.id, e.target.value)} rows={2} style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontFamily: 'monospace', fontSize: '0.74rem', resize: 'none', outline: 'none', boxSizing: 'border-box', opacity: isStepRunning ? 1 : 0.8 }} />
+                                    
+                                    {/* 접힘 상태 컴포넌트 마킹 분기 가드 장착 */}
+                                    <AnimatePresence initial={false}>
+                                      {!isCollapsed && (
+                                        <motion.div
+                                          initial={{ opacity: 0, height: 0 }}
+                                          animate={{ opacity: 1, height: 'auto' }}
+                                          exit={{ opacity: 0, height: 0 }}
+                                          transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                          style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}
+                                        >
+                                          {matchingToolInfo?.description && (
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', padding: '2px 0', lineHeight: '1.4' }}>
+                                              {matchingToolInfo.description}
+                                            </div>
+                                          )}
+                                          <textarea 
+                                            value={step.argsTemplate} 
+                                            onChange={e => handleStepArgsChange(step.id, e.target.value)} 
+                                            rows={3} 
+                                            style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontFamily: 'monospace', fontSize: '0.74rem', resize: 'vertical', outline: 'none', boxSizing: 'border-box', opacity: isStepRunning ? 1 : 0.8 }} 
+                                          />
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
                                   </Reorder.Item>
                                 </React.Fragment>
                               );
