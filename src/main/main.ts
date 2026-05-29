@@ -524,7 +524,6 @@ function registerIpcHandlers() {
   // 자동화 시퀀스
   ipcMain.handle('mcp:get-automation-sequences', async () => {
     try {
-      // 💡 [핵심 수정] JOIN을 사용하여 마스터 정보와 스케줄(cron, lastRun) 정보를 한 번에 긁어옵니다.
       const sequences = await db.all(`
         SELECT 
           q.*, 
@@ -536,6 +535,13 @@ function registerIpcHandlers() {
       `);
       
       for (const seq of sequences) {
+        // 💡 [추가] DB에 저장된 JSON 문자열 변수를 프론트엔드가 쓸 수 있게 파싱
+        try {
+          seq.variables = seq.variables ? JSON.parse(seq.variables) : [];
+        } catch {
+          seq.variables = [];
+        }
+
         const steps = await db.all(
           'SELECT * FROM sequence_steps WHERE sequenceId = ? ORDER BY stepOrder ASC',
           [seq.id]
@@ -574,36 +580,35 @@ function registerIpcHandlers() {
 
   // src/main/main.ts 내부의 saveAutomationSequence 핸들러 교체
   ipcMain.handle('mcp:save-automation-sequence', async (event, payload) => {
-    const { id, name, description, cronExpression, isEnabled, steps } = payload;
-    
-    // 활성화 여부 기본값 가드 (전달 안 되면 활성화(1)가 기본)
+    const { id, name, description, cronExpression, isEnabled, steps, variables } = payload;
     const enabledFlag = isEnabled === false ? 0 : 1;
+    
+    // 💡 [추가] 배열 형태의 변수를 DB 텍스트 필드에 넣기 위해 JSON 문자열로 직렬화
+    const variablesJson = JSON.stringify(variables || []);
 
     try {
-      // 1. 트랜잭션 개시
       await db.run('BEGIN TRANSACTION');
 
-      // 2. 기존 시퀀스가 있는지 검사
       const existing = await db.get('SELECT id FROM automation_sequences WHERE id = ?', [id]);
 
       if (existing) {
-        // 💡 [수정] 이 장소에서 isEnabled 상태도 완벽하게 데이터베이스에 갱신 처리합니다.
+        // 💡 variables = ? 추가
         await db.run(
           `UPDATE automation_sequences 
-          SET name = ?, description = ?, isEnabled = ?, updatedAt = ? 
+          SET name = ?, description = ?, isEnabled = ?, variables = ?, updatedAt = ? 
           WHERE id = ?`,
-          [name, description, enabledFlag, Date.now(), id]
+          [name, description, enabledFlag, variablesJson, Date.now(), id]
         );
       } else {
-        // 💡 [수정] 신규 생성 시에도 isEnabled 상태를 함께 인서트합니다.
+        // 💡 variables 컬럼 및 데이터 바인딩 추가
         await db.run(
-          `INSERT INTO automation_sequences (id, name, description, isEnabled, createdAt, updatedAt) 
-          VALUES (?, ?, ?, ?, ?, ?)`,
-          [id, name, description, enabledFlag, Date.now(), Date.now()]
+          `INSERT INTO automation_sequences (id, name, description, isEnabled, variables, createdAt, updatedAt) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [id, name, description, enabledFlag, variablesJson, Date.now(), Date.now()]
         );
       }
 
-      // 3. 스케줄러 정보 동기화 (cronExpression 및 isEnabled 플래그 연동 업데이트)
+      // 3. 스케줄러 정보 동기화
       const existingSched = await db.get('SELECT id FROM automation_schedules WHERE sequenceId = ?', [id]);
       if (existingSched) {
         await db.run(
@@ -644,8 +649,6 @@ function registerIpcHandlers() {
 
       await db.run('COMMIT');
 
-      // 5. 💡 [중요] DB가 변경되었으므로 백그라운드 크론 엔진 알람 주기를 실시간으로 재부팅 갱신합니다.
-      // (이 영역에서 글로벌 sequenceEngine 인스턴스의 스케줄 재로딩 메서드를 호출해 주면 베스트입니다)
       if ((globalThis as any).sequenceEngine) {
         await (globalThis as any).sequenceEngine.initializeSchedules().catch(() => {});
       }

@@ -30,7 +30,7 @@ interface SavedSequence {
   isEnabled: boolean; 
   lastRunTimestamp: number | null;
   steps?: SelectedStep[]; 
-  variables?: SequenceVariable[]; // 💡 커스텀 가변 데이터 사양 수급
+  variables?: SequenceVariable[]; 
 }
 
 const Icon = {
@@ -39,26 +39,31 @@ const Icon = {
   Play: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
   Close: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   Clock: () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-  Help: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
   ArrowDown: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
   ArrowUp: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>,
   FlowDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
   Empty: () => <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>,
   Gear: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   Pin: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.12-2.58A2 2 0 0 1 16 10.18V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v5.18a2 2 0 0 1-.44 1.24L5.44 14a2 2 0 0 0-.44 1.24z"/></svg>,
-  Lightbulb: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5.5 5.5 0 0 0 12.5 2.5a5.5 5.5 0 0 0-5.5 5.5c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+  Lightbulb: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5.5 5.5 0 0 0 12.5 2.5a5.5 5.5 0 0 0-5.5 5.5c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
   Target: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
   Cpu: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" style={{ marginRight: '6px', flexShrink: 0 }}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="24"/><line x1="15" y1="20" x2="15" y2="24"/><line x1="20" y1="9" x2="24" y2="9"/><line x1="20" y1="15" x2="24" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>,
-  AlertCircle: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '4px', flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+  AlertCircleRed: () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>, 
+  AlertCircleBlue: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>, 
   More: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
   Edit: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>,
   Activity: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
   Network: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M12 8v8M5 16v-3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/></svg>,
-  CheckCircle: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+  CheckCircle: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+  Variable: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>,
+  Link: () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  Flash: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 };
 
 export default function AutomationView() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAllVarsPopupOpen, setIsAllVarsPopupOpen] = useState(false); 
+  const [isHelpOpen, setIsHelpOpen] = useState(false); 
   const [savedSequences, setSavedSequences] = useState<SavedSequence[]>([]);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [failedSequenceIds, setFailedSequenceIds] = useState<Set<string>>(new Set());
@@ -73,15 +78,23 @@ export default function AutomationView() {
   const [sequenceDesc, setSequenceDesc] = useState('');
   const [cronExpr, setCronExpr] = useState('0 3 * * *'); 
   const [steps, setSteps] = useState<SelectedStep[]>([]);
-  const [variables, setVariables] = useState<SequenceVariable[]>([]); // 💡 커스텀 변수 상태 추가
+  const [variables, setVariables] = useState<SequenceVariable[]>([]); 
   const [draggingTool, setDraggingTool] = useState<McpTool | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [failedStepIndex, setFailedStepIndex] = useState<number | null>(null);
   const [failedError, setFailedError] = useState<string | null>(null);
   const [tooltipStepId, setTooltipStepId] = useState<string | null>(null);
 
-  // 💡 특정 스텝 노드의 접힘/펼침(Collapse) 상태를 제어하기 위한 인프라 풀
   const [collapsedSteps, setCollapsedSteps] = useState<Set<string>>(new Set());
+  const [rawJsonModeSteps, setRawJsonModeSteps] = useState<Set<string>>(new Set()); 
+  const [isVarsCollapsed, setIsVarsCollapsed] = useState(false); 
+
+  // 필드별 칩 팝업 레이어 오픈 상태 관리
+  const [activeChipMenuId, setActiveChipMenuId] = useState<string | null>(null);
+
+  // 인풋창 임시 변수명 풀
+  const [editingVarKeyIdx, setEditingVarKeyIdx] = useState<number | null>(null);
+  const [editingVarKeyVal, setEditingVarKeyVal] = useState<string>('');
 
   // 실시간 관제 및 네이티브 컨펌 대체 브릿지 훅
   const [runningSequenceId, setRunningSequenceId] = useState<string | null>(null);
@@ -98,6 +111,7 @@ export default function AutomationView() {
     setMenuOpenSeqIdState(id);
   };
   const menuRef = useRef<HTMLDivElement>(null);
+  const chipMenuRef = useRef<HTMLDivElement>(null);
 
   const fetchAutomationData = async () => {
     const list = await window.electronAPI.getMcpPluginsList().catch(() => []);
@@ -120,7 +134,21 @@ export default function AutomationView() {
       input_schema: { type: 'object', properties: { prompt: { type: 'string' } } },
       pluginId: 'AI_Core'
     };
-    setAvailableTools([aiVirtualTool, ...mappedTools]);
+
+    const variableSetTool: McpTool = {
+      name: 'core__set_variable',
+      description: '이전 노드의 반환 데이터나 특정 텍스트를 글로벌 변수(Variables)에 강제 대입하여 바인딩 캐시를 업데이트합니다.',
+      input_schema: { 
+        type: 'object', 
+        properties: { 
+          target_variable: { type: 'string', description: '값을 저장할 대상 전역 변수 이름' },
+          value_to_store: { type: 'string', description: '변수에 주입할 데이터 또는 마커 마킹' }
+        } 
+      },
+      pluginId: 'AI_Core'
+    };
+
+    setAvailableTools([aiVirtualTool, variableSetTool, ...mappedTools]);
 
     if (window.electronAPI.getAutomationSequences) {
       const savedList = await window.electronAPI.getAutomationSequences().catch(() => []);
@@ -176,6 +204,9 @@ export default function AutomationView() {
         if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
           setMenuOpenSeqId(null);
         }
+        if (chipMenuRef.current && !chipMenuRef.current.contains(e.target as Node)) {
+          setActiveChipMenuId(null);
+        }
     };
     document.addEventListener('mousedown', handleOutsideClick);
 
@@ -183,24 +214,24 @@ export default function AutomationView() {
         document.removeEventListener('mousedown', handleOutsideClick);
         window.electronAPI.offSequenceStatus?.();
     };
-  }, []);
+  }, [editingVarKeyIdx, editingVarKeyVal, variables]);
 
   const filteredTools = activePluginFilter === 'all' 
     ? availableTools 
     : availableTools.filter(t => t.pluginId === activePluginFilter);
 
-  const triggerHelpToast = () => {
-    setToastMessage("변수 체이닝 가이드: {{variables.내변수}} 구조 또는 앞선 스텝의 결과물 마커 {{step_0.output}}를 기입하여 런타임에 인라인 치환 주입할 수 있습니다.");
-    setTimeout(() => setToastMessage(null), 5000);
-  };
-
   const handleDropOnBoard = (e: React.DragEvent) => {
     e.preventDefault();
     if (!draggingTool) return;
 
-    const defaultSchema = draggingTool.name === 'ai__ask_llm'
-      ? '{\n  "prompt": "여기에 프롬프트를 입력하세요.\\n\\n변수 연동: {{variables.my_var}}\\n이전 데이터: {{step_0.output}}"\n}'
-      : JSON.stringify(Object.keys(draggingTool.input_schema.properties || {}).reduce((acc: any, key) => { acc[key] = "값 기입"; return acc; }, {}), null, 2);
+    let defaultSchema = "";
+    if (draggingTool.name === 'ai__ask_llm') {
+      defaultSchema = '{\n  "prompt": "여기에 프롬프트를 입력하세요.\\n\\n변수 연동: {{variables.my_var}}\\n이전 데이터: {{step_0.output}}"\n}';
+    } else if (draggingTool.name === 'core__set_variable') {
+      defaultSchema = '{\n  "target_variable": "",\n  "value_to_store": "{{step_0.output}}"\n}';
+    } else {
+      defaultSchema = JSON.stringify(Object.keys(draggingTool.input_schema.properties || {}).reduce((acc: any, key) => { acc[key] = ""; return acc; }, {}), null, 2);
+    }
 
     const newStep: SelectedStep = {
       id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
@@ -225,15 +256,75 @@ export default function AutomationView() {
     });
   };
 
-  // 💡 커스텀 변수 처리 핸들러 모음
+  const toggleRawJsonMode = (id: string) => {
+    setRawJsonModeSteps(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleAddVariable = () => {
-    setVariables(prev => [...prev, { key: 'new_variable', value: '값 기입' }]);
+    let index = 1;
+    let proposedKey = `variable_${index}`;
+    while (variables.some(v => v.key === proposedKey)) {
+      index++;
+      proposedKey = `variable_${index}`;
+    }
+    setVariables(prev => [...prev, { key: proposedKey, value: '' }]);
   };
+
+  const handleCommitVariableKey = (index: number) => {
+    if (editingVarKeyIdx !== index) return;
+    
+    const cleanKey = editingVarKeyVal.replace(/\s+/g, '');
+    if (!cleanKey) {
+      setEditingVarKeyIdx(null);
+      return;
+    }
+
+    const isDuplicate = variables.some((v, i) => i !== index && v.key === cleanKey);
+    if (isDuplicate) {
+      setToastMessage(`⚠️ 중복된 변수명 [${cleanKey}]은 지정할 수 없습니다.`);
+      setTimeout(() => setToastMessage(null), 3000);
+      setEditingVarKeyIdx(null);
+      return;
+    }
+
+    setVariables(prev => prev.map((v, i) => i === index ? { ...v, key: cleanKey } : v));
+    setEditingVarKeyIdx(null);
+  };
+
   const handleUpdateVariable = (index: number, field: 'key' | 'value', value: string) => {
-    setVariables(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+    if (field === 'key') {
+      setEditingVarKeyVal(value.replace(/\s+/g, ''));
+      setEditingVarKeyIdx(index);
+    } else {
+      setVariables(prev => prev.map((v, i) => i === index ? { ...v, value } : v));
+    }
   };
+
   const handleRemoveVariable = (index: number) => {
     setVariables(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleStructuredFieldChange = (stepId: string, currentTemplate: string, fieldKey: string, fieldValue: string, isAppend = false) => {
+    let currentObj: Record<string, any> = {};
+    try {
+      currentObj = JSON.parse(currentTemplate);
+    } catch (e) {
+      currentObj = {};
+    }
+
+    if (isAppend) {
+      const oldVal = currentObj[fieldKey] ? String(currentObj[fieldKey]) : "";
+      currentObj[fieldKey] = oldVal ? `${oldVal} ${fieldValue}` : fieldValue;
+    } else {
+      currentObj[fieldKey] = fieldValue;
+    }
+
+    handleStepArgsChange(stepId, JSON.stringify(currentObj, null, 2));
   };
 
   const handleToggleSequenceEnable = async (seq: SavedSequence) => {
@@ -265,7 +356,7 @@ export default function AutomationView() {
     setSequenceDesc(seq.description);
     setCronExpr(seq.cronExpression || '0 3 * * *'); 
     setSteps(seq.steps || []); 
-    setVariables(seq.variables || []); // 💡 보관된 변수 레이어 디코딩
+    setVariables(seq.variables || []); 
     setIsModalOpen(true);
     setMenuOpenSeqId(null);
   };
@@ -338,6 +429,10 @@ export default function AutomationView() {
     setSteps([]);
     setVariables([]);
     setCollapsedSteps(new Set());
+    setRawJsonModeSteps(new Set());
+    setIsVarsCollapsed(false);
+    setActiveChipMenuId(null);
+    setEditingVarKeyIdx(null);
     setIsModalOpen(false);
   };
 
@@ -369,7 +464,7 @@ export default function AutomationView() {
       cronExpression: cronExpr.trim(),
       isEnabled: true, 
       steps: formattedSteps,
-      variables // 💡 백엔드 스케줄러 링크로 변수 바인딩 주입
+      variables 
     };
 
     if (window.electronAPI.saveAutomationSequence) {
@@ -398,6 +493,22 @@ export default function AutomationView() {
     color: '#fff'
   };
 
+  const sharedChipBtnStyle = (bgColor: string, color: string): React.CSSProperties => ({
+    border: 'none',
+    background: bgColor,
+    color: color,
+    fontSize: '0.65rem',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontWeight: 600,
+    display: 'inline-flex',
+    alignItems: 'center',
+    height: '18px',
+    lineHeight: '1',
+    boxSizing: 'border-box'
+  });
+
   return (
     <div style={{ width: '100%', height: '100%', overflowY: 'auto', boxSizing: 'border-box', color: 'var(--color-text-main)' }}>
       <style>{`
@@ -425,7 +536,7 @@ export default function AutomationView() {
       <AnimatePresence>
         {toastMessage && typeof document !== 'undefined' && createPortal(
           <motion.div initial={{ opacity: 0, y: -20, x: 20 }} animate={{ opacity: 1, y: 0, x: 0 }} exit={{ opacity: 0, y: -10 }} style={{ position: 'fixed', top: '20px', right: '20px', width: '320px', background: 'rgba(30, 30, 38, 0.95)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '12px', padding: '14px', boxShadow: '0 12px 30px rgba(0,0,0,0.25)', color: '#FFFFFF', fontSize: '0.8rem', zIndex: 11000, backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-            <Icon.Lightbulb />
+            <Icon.AlertCircleBlue />
             <div>{toastMessage}</div>
           </motion.div>,
           document.body
@@ -470,6 +581,102 @@ export default function AutomationView() {
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
                   <button onClick={() => setDeleteModalTarget(null)} style={{ padding: '8px 14px', border: 'none', background: 'rgba(128,128,128,0.1)', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer' }}>취소</button>
                   <button onClick={handleRemoveSequence} style={{ padding: '8px 16px', border: 'none', background: '#ef4444', color: '#fff', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>영구 삭제</button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* 전체 변수 와이드 리스트 오버레이 편집 팝업 */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isAllVarsPopupOpen && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100020 }} onClick={() => setIsAllVarsPopupOpen(false)}>
+              <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }} onClick={e => e.stopPropagation()} style={{ width: '480px', maxHeight: '80vh', background: 'var(--bg-modal)', border: 'var(--border-glass)', borderRadius: '18px', padding: '20px', boxShadow: '0 20px 50px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '8px' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}><Icon.Variable /> 전체 파이프라인 변수 목록</div>
+                  <button onClick={() => setIsAllVarsPopupOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}><Icon.Close /></button>
+                </div>
+                
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+                  {variables.map((variable, vIdx) => {
+                    const isCurrentEditing = editingVarKeyIdx === vIdx;
+                    return (
+                      <div key={vIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-glass-input)', borderRadius: '8px', padding: '6px 10px' }}>
+                        <input 
+                          type="text" 
+                          value={isCurrentEditing ? editingVarKeyVal : variable.key} 
+                          onChange={e => handleUpdateVariable(vIdx, 'key', e.target.value)} 
+                          onKeyDown={e => { if (e.key === 'Enter') handleCommitVariableKey(vIdx); }}
+                          onBlur={() => handleCommitVariableKey(vIdx)}
+                          placeholder="변수명" 
+                          style={{ border: 'none', background: 'transparent', color: '#2563eb', fontWeight: 700, fontSize: '0.78rem', width: '120px', outline: 'none' }} 
+                        />
+                        <span style={{ color: 'var(--color-text-muted)' }}>:</span>
+                        <input type="text" value={variable.value} onChange={e => handleUpdateVariable(vIdx, 'value', e.target.value)} placeholder="기본값" style={{ border: 'none', background: 'transparent', color: 'inherit', fontSize: '0.78rem', flex: 1, outline: 'none' }} />
+                        <button onClick={() => handleRemoveVariable(vIdx)} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><Icon.Trash /></button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                  <button onClick={handleAddVariable} style={{ border: 'none', background: 'rgba(37,99,235,0.1)', color: '#2563eb', padding: '6px 14px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}><Icon.Plus /> 변수 추가</button>
+                  <button onClick={() => setIsAllVarsPopupOpen(false)} style={{ border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', padding: '6px 14px', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}>닫기</button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* 도움말 가상 가이드 팝업 룸 */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isHelpOpen && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(15px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100025 }} onClick={() => setIsHelpOpen(false)}>
+              <motion.div initial={{ opacity: 0, y: 15, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.96 }} onClick={e => e.stopPropagation()} style={{ width: '560px', maxHeight: '82vh', background: 'var(--bg-bubble-bot)', border: 'var(--border-glass)', borderRadius: '20px', padding: '24px', boxShadow: '0 25px 60px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '14px', boxSizing: 'border-box' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(128,128,128,0.15)', paddingBottom: '10px', flexShrink: 0 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Icon.AlertCircleBlue /> MCP 파이프라인 자동화 엔진 사용 가이드
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button onClick={() => setIsHelpOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: '0.78rem', color: 'var(--color-text-muted)', cursor: 'pointer', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor='rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor='transparent'}>닫기</button>
+                    <button onClick={() => setIsHelpOpen(false)} style={{ background: 'rgba(128,128,128,0.1)', border: 'none', padding: '5px', borderRadius: '50%', color: 'var(--color-text-main)', cursor: 'pointer', display: 'flex' }}><Icon.Close /></button>
+                  </div>
+                </div>
+                
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', fontSize: '0.92rem', lineHeight: '1.7', color: 'var(--color-text-main)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.05rem', fontWeight: 700, margin: '0 0 8px 0', color: '#2563eb' }}>
+                    <Icon.Lightbulb /> 변수 체이닝 및 포워딩 인프라 구조
+                  </div>
+                  <p style={{ margin: '0 0 12px 0', color: 'var(--color-text-muted)', paddingLeft: '4px' }}>각 노드(Node) 간의 유기적 통신 및 가변 인자 매핑을 위해 두 가지 강력한 바인딩 토큰을 지원합니다.</p>
+                  
+                  <blockquote style={{ margin: '12px 0', padding: '10px 14px', borderLeft: '3px solid #2563eb', background: 'rgba(37,99,235,0.04)', borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}>
+                    <strong style={{ color: 'var(--color-text-main)', fontWeight: 800 }}>1. 이전 노드 결과 바인딩 (Node Output Chaining)</strong><br />
+                    • 문법 규격: <code style={{ background: 'rgba(128,128,128,0.1)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#c2410c' }}>{"{{step_X.output}}"}</code><br />
+                    • 직전 또는 이전 차례 노드가 성공적으로 내놓은 실행 결과 텍스트 자원을 런타임에 동적으로 토스받아 치환합니다.
+                  </blockquote>
+
+                  <blockquote style={{ margin: '12px 0', padding: '10px 14px', borderLeft: '3px solid #f59e0b', background: 'rgba(245,158,11,0.04)', borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}>
+                    <strong style={{ color: 'var(--color-text-main)', fontWeight: 800 }}>2. 글로벌 파이프라인 가변 변수 (Global Variables)</strong><br />
+                    • 문법 규격: <code style={{ background: 'rgba(128,128,128,0.1)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#2563eb' }}>{"{{variables.변수명}}"}</code><br />
+                    • 상단 변수 관리 바에서 선언한 고유의 캐시 식별자 기본값을 본문에 주입하거나 후속 가동 조건문으로 인라인 결합합니다.
+                  </blockquote>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.05rem', fontWeight: 700, margin: '18px 0 8px 0', color: '#10b981' }}>
+                    <Icon.Flash /> core__set_variable 제어 규격
+                  </div>
+                  <p style={{ margin: '0 0 6px 0', paddingLeft: '4px' }}>파이프라인 중간 흐름에 <code style={{ fontFamily: 'monospace', fontWeight: 700 }}>set_variable</code> 가상 도구 노드를 배치하면, 실물 플러그인 결과물을 전 전역 변수 공간에 실시간으로 대입(저장)하여 후속 노드들의 멀티 체이닝 효율성을 극대화합니다.</p>
+                  <p style={{ margin: '0', fontSize: '0.82rem', color: 'var(--color-text-muted)', paddingLeft: '4px' }}>※ 입력 필드 우측의 <strong style={{ color: '#2563eb', fontWeight: 800 }}>[🔗 바인딩 선택]</strong> 컴포넌트를 터치하면, 칩의 홍수 현상 없이 깔끔하게 마커를 조립 적재할 수 있습니다.</p>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', flexShrink: 0, marginTop: '4px' }}>
+                  <button onClick={() => setIsHelpOpen(false)} style={{ border: 'none', background: 'var(--color-text-main)', color: 'var(--color-btn-text)', padding: '8px 18px', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer' }}>확인 완료</button>
                 </div>
               </motion.div>
             </div>
@@ -527,28 +734,31 @@ export default function AutomationView() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '65%' }}>
-                        <span style={{ color: isEnabled ? (isCurrentRunning ? '#3b82f6' : '#10b981') : 'var(--color-text-muted)', display: 'flex', alignItems: 'center', opacity: isEnabled ? 1 : 0.35 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '65%', minWidth: 0 }}>
+                        <span style={{ color: isEnabled ? (isCurrentRunning ? '#3b82f6' : '#10b981') : 'var(--color-text-muted)', display: 'flex', alignItems: 'center', opacity: isEnabled ? 1 : 0.35, flexShrink: 0 }}>
                           <Icon.Network />
                         </span>
                         
                         {isEnabled && !isCurrentFailed && !isCurrentCompleted && (
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 5px #10b981' }} />
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 5px #10b981', flexShrink: 0 }} />
                         )}
 
                         {isCurrentFailed && (
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 5px #ef4444' }} />
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 5px #ef4444', flexShrink: 0 }} />
                         )}
 
                         {isCurrentCompleted && (
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }} className="pulse-active-dot" />
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981', flexShrink: 0 }} className="pulse-active-dot" />
                         )}
 
                         {isCurrentRunning && (
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', boxShadow: '0 0 5px #3b82f6', marginLeft: '-2px' }} className="pulse-active-dot" />
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6', boxShadow: '0 0 5px #3b82f6', marginLeft: '-2px', flexShrink: 0 }} className="pulse-active-dot" />
                         )}
                         
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-main)', opacity: isEnabled ? 1 : 0.55 }}>{seq.name}</span>
+                        {/* 💡 [수정 완료] 메인 대시보드 카드 내부 타이틀 말줄임 보호막 장착(텍스트 붕괴 방어) */}
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-main)', opacity: isEnabled ? 1 : 0.55, flexGrow: 1, minWidth: 0 }}>
+                          {seq.name}
+                        </span>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
@@ -568,7 +778,7 @@ export default function AutomationView() {
                           {isCurrentRunning ? "running" : isCurrentFailed ? "failed" : isCurrentCompleted ? "completed" : isEnabled ? "ready" : "off"}
                         </span>
 
-                        <span style={{ ...baseBadgeStyle, fontFamily: 'monospace', color: 'var(--color-text-muted)', backgroundColor: 'rgba(128, 128, 128, 0.06)', border: '1px solid rgba(128, 128, 128, 0.15)', opacity: isEnabled ? 1 : 0.4 }}>
+                        <span style={{ ...baseBadgeStyle, fontFamily: 'monospace', color: 'var(--color-text-muted)', backgroundColor: 'rgba(128, 128, 128, 0.06)', border: '1px solid rgba(128, 128, 128, 0.15)', opacity: isEnabled ? 1 : 0.4, flexShrink: 0 }}>
                           {seq.cronExpression}
                         </span>
                       </div>
@@ -699,7 +909,14 @@ export default function AutomationView() {
                       );
                     })()}
 
-                    <button onClick={triggerHelpToast} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}><Icon.Help /></button>
+                    <button 
+                      onClick={() => setIsHelpOpen(true)} 
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '50%' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.06)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <Icon.AlertCircleBlue />
+                    </button>
                   </div>
                   <button onClick={closeModal} style={{ background: 'rgba(128,128,128,0.1)', border: 'none', padding: '6px', borderRadius: '50%', color: 'var(--color-text-main)', cursor: 'pointer' }}><Icon.Close /></button>
                 </div>
@@ -716,10 +933,10 @@ export default function AutomationView() {
 
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '2px' }}>
                       {filteredTools.map((tool) => (
-                        <motion.div key={tool.name} draggable onDragStart={() => setDraggingTool(tool)} whileHover={{ x: 2 }} style={{ padding: '8px 10px', borderRadius: '8px', background: tool.name === 'ai__ask_llm' ? 'rgba(37,99,235,0.08)' : 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.08)', cursor: 'grab', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                        <motion.div key={tool.name} draggable onDragStart={() => setDraggingTool(tool)} whileHover={{ x: 2 }} style={{ padding: '8px 10px', borderRadius: '8px', background: tool.name.startsWith('ai__') || tool.name.startsWith('core__') ? 'rgba(37,99,235,0.08)' : 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.08)', cursor: 'grab', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                            {tool.name === 'ai__ask_llm' && <Icon.Cpu />}
-                            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: tool.name === 'ai__ask_llm' ? '#2563eb' : 'inherit' }}>{tool.name.includes('__') ? tool.name.split('__')[1] : tool.name}</div>
+                            {(tool.name.startsWith('ai__') || tool.name.startsWith('core__')) ? <Icon.Cpu /> : <Icon.Activity />}
+                            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: tool.name.startsWith('ai__') || tool.name.startsWith('core__') ? '#2563eb' : 'inherit' }}>{tool.name.includes('__') ? tool.name.split('__')[1] : tool.name}</div>
                           </div>
                           {tool.description && (
                             <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tool.description}</div>
@@ -742,35 +959,69 @@ export default function AutomationView() {
                       </button>
                     </div>
 
-                    {/* 💡 [신설] 시퀀스 글로벌 변수 관리 가변 레이어 단추 컴포넌트 */}
-                    <div style={{ background: 'var(--bg-glass-card)', border: 'var(--border-glass)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+                    {/* 글로벌 변수 관리 가변 레이어 폴딩 및 보기 고도화 컴포넌트 */}
+                    <div style={{ background: 'var(--bg-glass-card)', border: 'var(--border-glass)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: isVarsCollapsed ? '0px' : '8px', flexShrink: 0, transition: 'gap 0.2s ease' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.03em' }}>⚡ 글로벌 파이프라인 가변 변수 (Variables)</span>
-                        <button onClick={handleAddVariable} style={{ border: 'none', background: 'rgba(37,99,235,0.1)', color: '#2563eb', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          <Icon.Plus /> 변수 추가
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} onClick={() => setIsVarsCollapsed(!isVarsCollapsed)}>
+                          <span style={{ color: '#2563eb', display: 'flex', alignItems: 'center' }}><Icon.Variable /></span>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.03em' }}>글로벌 파이프라인 가변 변수 (Variables)</span>
+                          <span style={{ color: 'var(--color-text-muted)', display: 'flex' }}>
+                            {isVarsCollapsed ? <Icon.ArrowDown /> : <Icon.ArrowUp />}
+                          </span>
+                        </div>
+                        
+                        {!isVarsCollapsed && (
+                          <button onClick={handleAddVariable} style={{ border: 'none', background: 'rgba(37,99,235,0.1)', color: '#2563eb', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <Icon.Plus /> 변수 추가
+                          </button>
+                        )}
                       </div>
                       
-                      {variables.length === 0 ? (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>등록된 고유 가변인자가 없습니다. 각 스텝에서 `{"{{variables.변수명}} "}` 마커로 치환 연동이 지원됩니다.</div>
-                      ) : (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '72px', overflowY: 'auto', paddingRight: '4px' }}>
-                          {variables.map((variable, vIdx) => (
-                            <div key={vIdx} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-glass-input)', borderRadius: '6px', padding: '2px 6px' }}>
-                              <input type="text" value={variable.key} onChange={e => handleUpdateVariable(vIdx, 'key', e.target.value)} placeholder="변수명" style={{ border: 'none', background: 'transparent', color: '#2563eb', fontWeight: 700, fontSize: '0.72rem', width: '80px', outline: 'none' }} />
-                              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>:</span>
-                              <input type="text" value={variable.value} onChange={e => handleUpdateVariable(vIdx, 'value', e.target.value)} placeholder="기본값" style={{ border: 'none', background: 'transparent', color: 'inherit', fontSize: '0.72rem', width: '100px', outline: 'none' }} />
-                              <button onClick={() => handleRemoveVariable(vIdx)} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 2px' }}>
-                                <Icon.Trash />
-                              </button>
+                      {!isVarsCollapsed && (
+                        <>
+                          {variables.length === 0 ? (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>등록된 고유 가변인자가 없습니다. 각 스텝에서 변수명 단추를 클릭해 자동 매핑 치환 연동이 지원됩니다.</div>
+                          ) : (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                              {variables.slice(0, 5).map((variable, vIdx) => {
+                                const isCurrentEditing = editingVarKeyIdx === vIdx;
+                                return (
+                                  <div key={vIdx} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-glass-input)', borderRadius: '6px', padding: '2px 6px', height: '24px', boxSizing: 'border-box' }}>
+                                    <input 
+                                      type="text" 
+                                      value={isCurrentEditing ? editingVarKeyVal : variable.key} 
+                                      onChange={e => handleUpdateVariable(vIdx, 'key', e.target.value)} 
+                                      onKeyDown={e => { if (e.key === 'Enter') handleCommitVariableKey(vIdx); }}
+                                      onBlur={() => handleCommitVariableKey(vIdx)}
+                                      placeholder="변수명" 
+                                      style={{ border: 'none', background: 'transparent', color: '#2563eb', fontWeight: 700, fontSize: '0.72rem', width: '75px', outline: 'none' }} 
+                                    />
+                                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>:</span>
+                                    <input type="text" value={variable.value} onChange={e => handleUpdateVariable(vIdx, 'value', e.target.value)} placeholder="기본값" style={{ border: 'none', background: 'transparent', color: 'inherit', fontSize: '0.72rem', width: '85px', outline: 'none' }} />
+                                    <button onClick={() => handleRemoveVariable(vIdx)} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 2px' }}>
+                                      <Icon.Trash />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                              
+                              {variables.length > 5 && (
+                                <button 
+                                  onClick={() => setIsAllVarsPopupOpen(true)}
+                                  style={{ border: '1px dashed #2563eb', background: 'rgba(37,99,235,0.03)', color: '#2563eb', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', cursor: 'pointer', height: '24px' }}
+                                >
+                                  + {variables.length - 5}개 변수 더보기 및 편집
+                                </button>
+                              )}
                             </div>
-                          ))}
-                        </div>
+                          )}
+                        </>
                       )}
                     </div>
 
                     {/* 실시간 드롭 보드 그래프 메인 스페이스 */}
-                    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropOnBoard} style={{ flex: 1, borderRadius: '14px', background: draggingTool ? 'rgba(37, 99, 235, 0.03)' : 'rgba(128,128,128,0.01)', border: draggingTool ? '2px dashed #2563eb' : '1px dashed var(--border-glass-input)', padding: '12px', overflowY: 'auto', minHeight: 0 }}>
+                    {/* 💡 [정밀 가드 패치] 스크롤 기능 무력화 원인인 overflowY: 'visible'을 원래 규격인 'auto'로 정정 롤백 완료 */}
+                    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropOnBoard} style={{ flex: 1, borderRadius: '14px', background: draggingTool ? 'rgba(37, 99, 235, 0.03)' : 'rgba(128,128,128,0.01)', border: draggingTool ? '2px dashed #2563eb' : '1px dashed var(--border-glass-input)', padding: '12px 14px 24px 12px', overflowY: 'auto', minHeight: 0, position: 'relative' }}>
                       {steps.length === 0 ? (
                         <div style={{ display: 'flex', width: '100%', height: '100%', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
                           <span style={{ margin: 'auto' }}>좌측 도구들을 이곳에 드롭하여 실행 파이프라인 그래프를 설계하세요.</span>
@@ -783,8 +1034,16 @@ export default function AutomationView() {
                               const isStepPassed = runningSequenceId === editingSequenceId && activeStepIndex !== null && activeStepIndex > index;
                               const isStepFailed = failedSequenceIds.has(editingSequenceId ?? '') && failedStepIndex === index;
                               const isCollapsed = collapsedSteps.has(step.id);
+                              const isRawJsonMode = rawJsonModeSteps.has(step.id);
                               
                               const matchingToolInfo = availableTools.find(t => t.name === step.fullToolName);
+
+                              let parsedArgs: Record<string, any> = {};
+                              try {
+                                parsedArgs = JSON.parse(step.argsTemplate);
+                              } catch (e) {
+                                parsedArgs = {};
+                              }
 
                               return (
                                 <React.Fragment key={step.id}>
@@ -805,11 +1064,13 @@ export default function AutomationView() {
                                       border: isStepRunning ? '1.5px solid #10b981'
                                         : isStepFailed ? '1.5px solid #ef4444'
                                         : isStepPassed ? '1px solid rgba(16, 185, 129, 0.4)'
-                                        : step.fullToolName === 'ai__ask_llm' ? '1px solid rgba(37,99,235,0.3)' : 'var(--border-glass)', 
+                                        : (step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? '1px solid rgba(37,99,235,0.3)' : 'var(--border-glass)', 
                                       borderRadius: '12px', padding: '10px 14px', cursor: 'grab', 
                                       boxShadow: isStepRunning ? '0 0 15px rgba(16, 185, 129, 0.15)'
                                         : isStepFailed ? '0 0 15px rgba(239, 68, 68, 0.15)' : '0 2px 8px rgba(0,0,0,0.02)', 
                                       flexShrink: 0,
+                                      // 💡 [중요 패치] 팝업 레이어가 열려있는 특정 노드 카드만 zIndex 계층을 강제 활성화하여 auto 스크롤 환경에서도 메뉴가 가려지거나 잘리지 않도록 정밀 마감
+                                      zIndex: activeChipMenuId?.startsWith(step.id) ? 100 : 2,
                                       transition: 'border-color 0.3s ease, box-shadow 0.3s ease, gap 0.2s ease'
                                     }}
                                   >
@@ -821,7 +1082,7 @@ export default function AutomationView() {
                                     )}
                                     
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isStepRunning ? '#10b981' : isStepFailed ? '#ef4444' : step.fullToolName === 'ai__ask_llm' ? '#2563eb' : 'var(--color-text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isStepRunning ? '#10b981' : isStepFailed ? '#ef4444' : (step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? '#2563eb' : 'var(--color-text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         
                                         {isStepFailed ? (
                                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444', marginRight: '4px' }} />
@@ -831,13 +1092,21 @@ export default function AutomationView() {
                                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', marginRight: '4px' }} />
                                         ) : null}
 
-                                        {step.fullToolName === 'ai__ask_llm' ? <Icon.Cpu /> : <Icon.Activity />}
+                                        {(step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? <Icon.Cpu /> : <Icon.Activity />}
                                         [Node {index}] {step.fullToolName.includes('__') ? step.fullToolName.split('__')[1] : step.fullToolName}
                                         <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>({step.pluginId})</span>
                                       </div>
                                       
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} onClick={e => e.stopPropagation()}>
-                                        {/* 💡 [신설] V 모양 가변 접기/펼치기 폴딩 컴포넌트 단추 배치 */}
+                                        {!isCollapsed && (
+                                          <button 
+                                            onClick={() => toggleRawJsonMode(step.id)}
+                                            style={{ border: '1px solid var(--border-glass-input)', background: isRawJsonMode ? 'rgba(37,99,235,0.1)' : 'transparent', color: isRawJsonMode ? '#2563eb' : 'var(--color-text-muted)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer' }}
+                                          >
+                                            {isRawJsonMode ? 'Form UI' : 'Raw JSON'}
+                                          </button>
+                                        )}
+
                                         <button 
                                           onClick={() => toggleStepCollapse(step.id)}
                                           style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '4px' }}
@@ -847,13 +1116,15 @@ export default function AutomationView() {
                                           {isCollapsed ? <Icon.ArrowDown /> : <Icon.ArrowUp />}
                                         </button>
                                         
-                                        <button onClick={() => handleRemoveStep(step.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                                          <Icon.AlertCircle />삭제
+                                        <button 
+                                          onClick={() => handleRemoveStep(step.id)} 
+                                          style={{ background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 700, cursor: 'pointer', fontSize: '0.72rem', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                        >
+                                          <Icon.AlertCircleRed /> 삭제
                                         </button>
                                       </div>
                                     </div>
                                     
-                                    {/* 접힘 상태 컴포넌트 마킹 분기 가드 장착 */}
                                     <AnimatePresence initial={false}>
                                       {!isCollapsed && (
                                         <motion.div
@@ -861,19 +1132,136 @@ export default function AutomationView() {
                                           animate={{ opacity: 1, height: 'auto' }}
                                           exit={{ opacity: 0, height: 0 }}
                                           transition={{ duration: 0.2, ease: 'easeInOut' }}
-                                          style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}
+                                          style={{ display: 'flex', flexDirection: 'column', gap: '6px' }} 
                                         >
                                           {matchingToolInfo?.description && (
                                             <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', padding: '2px 0', lineHeight: '1.4' }}>
                                               {matchingToolInfo.description}
                                             </div>
                                           )}
-                                          <textarea 
-                                            value={step.argsTemplate} 
-                                            onChange={e => handleStepArgsChange(step.id, e.target.value)} 
-                                            rows={3} 
-                                            style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontFamily: 'monospace', fontSize: '0.74rem', resize: 'vertical', outline: 'none', boxSizing: 'border-box', opacity: isStepRunning ? 1 : 0.8 }} 
-                                          />
+
+                                          {isRawJsonMode ? (
+                                            <textarea 
+                                              value={step.argsTemplate} 
+                                              onChange={e => handleStepArgsChange(step.id, e.target.value)} 
+                                              rows={4} 
+                                              style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-input)', color: 'inherit', fontFamily: 'monospace', fontSize: '0.74rem', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} 
+                                            />
+                                          ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-input)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-glass-input)', position: 'relative' }}>
+                                              
+                                              {/* 변수 할당용 전용 가상 폼 UI */}
+                                              {step.fullToolName === 'core__set_variable' ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-main)' }}>대상 변수 선택 (Target Variable)</label>
+                                                    <select 
+                                                      value={parsedArgs.target_variable || ""} 
+                                                      onChange={e => handleStructuredFieldChange(step.id, step.argsTemplate, 'target_variable', e.target.value)}
+                                                      style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-modal)', color: 'inherit', fontSize: '0.74rem', outline: 'none' }}
+                                                    >
+                                                      <option value="">-- 값을 저장할 변수 선택 --</option>
+                                                      {variables.map(v => <option key={v.key} value={v.key}>{v.key}</option>)}
+                                                    </select>
+                                                  </div>
+
+                                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px', position: 'relative' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                      <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-main)' }}>대입할 값 (Value to Store)</label>
+                                                      
+                                                      <div style={{ position: 'relative' }}>
+                                                        <button
+                                                          type="button"
+                                                          onClick={(e) => { e.stopPropagation(); setActiveChipMenuId(activeChipMenuId === `${step.id}_val` ? null : `${step.id}_val`); }}
+                                                          style={sharedChipBtnStyle('rgba(37,99,235,0.1)', '#2563eb')}
+                                                        >
+                                                          <Icon.Link /> 바인딩 선택
+                                                        </button>
+
+                                                        {activeChipMenuId === `${step.id}_val` && (
+                                                          <div ref={chipMenuRef} style={{ position: 'absolute', right: 0, top: '22px', backgroundColor: 'var(--bg-modal)', border: 'var(--border-glass)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', padding: '6px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '4px', width: '220px', maxHeight: '180px', overflowY: 'auto' }}>
+                                                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderBottom: '1px solid rgba(128,128,128,0.1)', paddingBottom: '2px' }}>노드 결과 풀</div>
+                                                            {index > 0 ? (
+                                                              <button type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, 'value_to_store', `{{step_${index - 1}.output}}`); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: 'var(--color-text-main)', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>Node {index - 1} 결과 대입</button>
+                                                            ) : <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', padding: '2px 4px' }}>이전 단계 없음</span>}
+                                                            
+                                                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '4px', paddingBottom: '2px' }}>글로벌 가변 변수 단일 대입</div>
+                                                            {variables.map(v => (
+                                                              <button key={v.key} type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, 'value_to_store', `{{variables.${v.key}}}`); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>{v.key} 대입</button>
+                                                            ))}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    <input 
+                                                      type="text"
+                                                      value={parsedArgs.value_to_store || ""}
+                                                      onChange={e => handleStructuredFieldChange(step.id, step.argsTemplate, 'value_to_store', e.target.value)}
+                                                      placeholder="값을 기입하거나 바인딩 선택 팝업을 활용해 단일 대입하세요."
+                                                      style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-modal)', color: 'inherit', fontSize: '0.74rem', outline: 'none', boxSizing: 'border-box' }}
+                                                    />
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                /* 일반 플러그인 또는 ask_llm 폼 UI */
+                                                matchingToolInfo?.input_schema?.properties && Object.keys(matchingToolInfo.input_schema.properties).length > 0 ? (
+                                                  Object.keys(matchingToolInfo.input_schema.properties).map((propKey) => {
+                                                    const propDetails = matchingToolInfo.input_schema.properties[propKey] || {};
+                                                    const currentVal = parsedArgs[propKey] ?? "";
+                                                    const menuKey = `${step.id}_${propKey}`;
+
+                                                    return (
+                                                      <div key={propKey} style={{ display: 'flex', flexDirection: 'column', gap: '3px', position: 'relative' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
+                                                            {propKey} <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>({propDetails.type || 'string'})</span>
+                                                          </label>
+
+                                                          <div style={{ position: 'relative' }}>
+                                                            <button
+                                                              type="button"
+                                                              onClick={(e) => { e.stopPropagation(); setActiveChipMenuId(activeChipMenuId === menuKey ? null : menuKey); }}
+                                                              style={sharedChipBtnStyle('rgba(37,99,235,0.06)', '#2563eb')}
+                                                            >
+                                                              <Icon.Link /> 바인딩 선택
+                                                            </button>
+
+                                                            {activeChipMenuId === menuKey && (
+                                                              <div ref={chipMenuRef} style={{ position: 'absolute', right: 0, top: '22px', backgroundColor: 'var(--bg-modal)', border: 'var(--border-glass)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', padding: '6px', zIndex: 1010, display: 'flex', flexDirection: 'column', gap: '4px', width: '200px', maxHeight: '180px', overflowY: 'auto' }}>
+                                                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderBottom: '1px solid rgba(128,128,128,0.1)', paddingBottom: '2px' }}>출력 데이터 연동</div>
+                                                                {index > 0 ? (
+                                                                  <button type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, propKey, `{{step_${index - 1}.output}}`, true); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: 'var(--color-text-main)', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>Node {index - 1} 결과 연동</button>
+                                                                ) : <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', padding: '2px 4px' }}>이전 단계 없음</span>}
+                                                                
+                                                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '4px', paddingBottom: '2px' }}>멀티 변수 호출 체이닝</div>
+                                                                {variables.map(v => (
+                                                                  <button key={v.key} type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, propKey, `{{variables.${v.key}}}`, true); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>{v.key} 추가</button>
+                                                                ))}
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        </div>
+
+                                                        {propDetails.description && (
+                                                          <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>{propDetails.description}</span>
+                                                        )}
+
+                                                        <input 
+                                                          type="text" 
+                                                          value={currentVal}
+                                                          onChange={e => handleStructuredFieldChange(step.id, step.argsTemplate, propKey, e.target.value)}
+                                                          placeholder="값을 기입하거나 바인딩 선택 단추를 눌러 변수 마커를 누적해 보세요."
+                                                          style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-modal)', color: 'inherit', fontSize: '0.74rem', outline: 'none', boxSizing: 'border-box' }}
+                                                        />
+                                                      </div>
+                                                    );
+                                                  })
+                                                ) : (
+                                                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '4px 0' }}>제어할 수 있는 Input Parameter가 없는 도구입니다.</div>
+                                                )
+                                              )}
+                                            </div>
+                                          )}
                                         </motion.div>
                                       )}
                                     </AnimatePresence>

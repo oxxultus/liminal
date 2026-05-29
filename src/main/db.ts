@@ -53,14 +53,14 @@ export async function initDb() {
       apiKey TEXT,
       workspaceDir TEXT,
       keywords TEXT,
-      version TEXT DEFAULT '1.0.0',       -- 💡 하단 메서드를 없애고 여기에 완전히 통일 및 정착
+      version TEXT DEFAULT '1.0.0',       
       enabled INTEGER NOT NULL DEFAULT 1
     );
 
     -- 5. 세션별 요약본 테이블 (UPSERT 붕괴 방지 패치)
     CREATE TABLE IF NOT EXISTS session_summaries (
       id TEXT PRIMARY KEY,
-      sessionId TEXT NOT NULL UNIQUE,  -- 💡 ON CONFLICT(sessionId)의 안정적 구동을 위해 UNIQUE 명시
+      sessionId TEXT NOT NULL UNIQUE,  
       summary TEXT NOT NULL,
       coveredUpTo INTEGER NOT NULL,
       createdAt INTEGER NOT NULL,
@@ -68,11 +68,13 @@ export async function initDb() {
     );
 
     -- 6. 시퀀스 마스터 테이블 (워크플로우의 이름과 순서 정의)
+    -- 💡 [변수 저장 필드 추가] variables TEXT 컬럼을 새로 추가했습니다.
     CREATE TABLE IF NOT EXISTS automation_sequences (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
       isEnabled INTEGER NOT NULL DEFAULT 1, 
+      variables TEXT,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL 
     );
@@ -85,12 +87,12 @@ export async function initDb() {
       fullToolName TEXT NOT NULL,
       argsTemplate TEXT NOT NULL,
       
-      -- 💡 [안전 스냅샷 필드 추가]
-      pluginId TEXT NOT NULL,         -- 대상 플러그인 고유 ID
-      pluginType TEXT NOT NULL,       -- 'custom' (Stdio) 또는 'remote'
-      pluginUrl TEXT,                 -- 스크립트 실물 경로 또는 원격 엔드포인트 URL
-      pluginApiKey TEXT,              -- 원격 연동용 API Key
-      pluginWorkspaceDir TEXT,        -- Stdio 실행용 작업 디렉토리
+      -- [안전 스냅샷 필드]
+      pluginId TEXT NOT NULL,         
+      pluginType TEXT NOT NULL,       
+      pluginUrl TEXT,                 
+      pluginApiKey TEXT,              
+      pluginWorkspaceDir TEXT,        
       
       FOREIGN KEY(sequenceId) REFERENCES automation_sequences(id) ON DELETE CASCADE
     );
@@ -99,7 +101,7 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS automation_schedules (
       id TEXT PRIMARY KEY,
       sequenceId TEXT NOT NULL UNIQUE,
-      cronExpression TEXT NOT NULL,        -- 예: '0 3 * * *' (매일 새벽 3시)
+      cronExpression TEXT NOT NULL,        
       isEnabled INTEGER NOT NULL DEFAULT 1,
       lastRunTimestamp INTEGER,
       FOREIGN KEY(sequenceId) REFERENCES automation_sequences(id) ON DELETE CASCADE

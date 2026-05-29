@@ -92,10 +92,32 @@ export class McpSequenceEngine {
   }
 
   async executeSequence(sequenceId: string): Promise<void> {
+    // 1. 해당 시퀀스의 명세 데이터(정적 기본값 및 변수) 호출
+    const sequenceMaster = await this.db.get(
+      'SELECT * FROM automation_sequences WHERE id = ?', [sequenceId]
+    );
+    
     const steps = await this.db.all(
       'SELECT * FROM sequence_steps WHERE sequenceId = ? ORDER BY stepOrder ASC',
       [sequenceId]
     );
+
+    // 💡 [인메모리 적재 1] 글로벌 변수 런타임 캐시 맵 빌드 
+    const runtimeVariables: Record<string, any> = {};
+    if (sequenceMaster && sequenceMaster.variables) {
+      try {
+        const parsedVars = JSON.parse(sequenceMaster.variables);
+        if (Array.isArray(parsedVars)) {
+          parsedVars.forEach((v: any) => {
+            if (v && v.key) runtimeVariables[v.key] = v.value;
+          });
+        }
+      } catch (e) {
+        console.error('❌ 시퀀스 가변 변수 초기화 JSON 파싱 실패:', e);
+      }
+    }
+
+    // 💡 [인메모리 적재 2] 스텝별 결과 보관 컨텍스트 저장소
     const contextStorage: Record<string, any> = {};
     const jitBootedPluginIds: string[] = [];
     let currentStepIndex: number | null = null;
@@ -113,11 +135,23 @@ export class McpSequenceEngine {
       for (const step of steps) {
         currentStepIndex = step.stepOrder;
 
-        // ✅ 스텝 시작 알림 + 최소 표시 시간 보장 (빠른 스텝도 UI에 표시)
+        // 스텝 시작 알림 + 최소 표시 시간 보장
         this.emit({ sequenceId, status: 'running', stepIndex: step.stepOrder });
         await new Promise(resolve => setTimeout(resolve, 300));
 
         let rawArgsStr = step.argsTemplate;
+
+        // 💡 [컴파일 가드 1] 글로벌 가변 변수 마커 전처리 치환 ({{variables.my_var}} 매핑)
+        Object.keys(runtimeVariables).forEach((vKey) => {
+          const vValue = runtimeVariables[vKey];
+          const safeVarValueStr = typeof vValue === 'string'
+            ? JSON.stringify(vValue).slice(1, -1)
+            : JSON.stringify(vValue);
+          const escapedVarKey = vKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          rawArgsStr = rawArgsStr.replace(new RegExp(`{{variables.${escapedVarKey}}}`, 'g'), safeVarValueStr);
+        });
+
+        // 💡 [컴파일 가드 2] 이전 단계 아웃풋 마커 전처리 치환 ({{step_X.output}} 매핑)
         Object.keys(contextStorage).forEach((key) => {
           const rawValue = contextStorage[key];
           const safeValueStr = typeof rawValue === 'string'
@@ -129,6 +163,23 @@ export class McpSequenceEngine {
 
         const parsedArgs = JSON.parse(rawArgsStr);
 
+        // 🎯 [대혁신 가상 분기 인터셉터] core__set_variable 변수 스토어 기능 작동 가드
+        if (step.fullToolName === 'core__set_variable') {
+          const targetKey = parsedArgs.target_variable;
+          const valueToStore = parsedArgs.value_to_store ?? "";
+          
+          if (targetKey) {
+            // 인메모리 가변 상태 풀 즉시 갱신 (정의되지 않은 임시 키라도 유연하게 주입 수용)
+            runtimeVariables[targetKey] = valueToStore;
+            console.log(`⚡ [Runtime Variable Set] 변수 [${targetKey}] 값 적재 성공:`, valueToStore);
+          }
+          
+          // 가상 도구 노드이므로 결과 컨텍스트만 채우고 하위 인프라 연동을 무시한 채 스킵
+          contextStorage[`step_${step.stepOrder}.output`] = valueToStore;
+          continue;
+        }
+
+        // --- 프로바이더 가동: ai__ask_llm 내부 가상 처리 엔진 분기 ---
         if (step.fullToolName === 'ai__ask_llm') {
           console.log(`🤖 [AI Bridge] LLM 추론 가동...`);
           const activeEngine = await this.db.get('SELECT * FROM engines LIMIT 1');
@@ -162,10 +213,12 @@ export class McpSequenceEngine {
           else if (activeEngine.provider === 'anthropic') aiReplyText = rawData.content?.[0]?.text || '';
           else if (activeEngine.provider === 'google') aiReplyText = rawData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
+          // 런타임 결과 적재
           contextStorage[`step_${step.stepOrder}.output`] = aiReplyText;
           continue;
         }
 
+        // --- 일반 실물 플러그인 도구 제어 라인 ---
         let pluginInstance = (this.pluginManager as any).plugins.get(step.pluginId);
         if (!pluginInstance) {
           await this.pluginManager.toggleSinglePlugin(step.pluginId, true);
@@ -183,6 +236,8 @@ export class McpSequenceEngine {
         } else {
           extractedOutput = String(stepResult || '');
         }
+        
+        // 최종 데이터 인메모리 컨텍스트 적재 포워딩 처리
         contextStorage[`step_${step.stepOrder}.output`] = extractedOutput;
       }
 
@@ -194,7 +249,6 @@ export class McpSequenceEngine {
       this.emit({ sequenceId, status: 'completed', stepIndex: null });
 
     } catch (error: any) {
-      // ✅ 실패한 스텝 인덱스도 함께 전달
       this.emit({ sequenceId, status: 'failed', stepIndex: currentStepIndex, error: error.message });
       throw error;
 
