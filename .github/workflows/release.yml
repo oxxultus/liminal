@@ -37,5 +37,5 @@ jobs:
       - name: Build and Publish Electron App
         run: npm run package
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
