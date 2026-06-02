@@ -57,7 +57,24 @@ const Icon = {
   CheckCircle: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
   Variable: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>,
   Link: () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
-  Flash: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+  Flash: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  
+  // 💡 [추가 사양] 다중 제어 분기 칩 헤더 장착용 신형 인라인 SVG 스택들
+  BranchIf: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+      <polyline points="20 12 14 12 14 6" /><path d="M4 18v-6a4 4 0 0 1 4-4h6" />
+    </svg>
+  ),
+  BranchElseIf: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+      <path d="M4 6h16M4 12h10M4 18h16" />
+    </svg>
+  ),
+  BranchEndIf: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+      <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12" />
+    </svg>
+  )
 };
 
 export default function AutomationView() {
@@ -148,7 +165,6 @@ export default function AutomationView() {
       pluginId: 'AI_Core'
     };
 
-    // 💡 [다중 조건 분기 추가] 최초 대문절 If 가상 노드
     const conditionIfTool: McpTool = {
       name: 'core__if_condition',
       description: '이전 단계의 반환 데이터나 변수 값을 비교 분석하여 조건이 참(True)일 때만 하위 블록 노드들을 통과시킵니다.',
@@ -163,7 +179,6 @@ export default function AutomationView() {
       pluginId: 'AI_Core'
     };
 
-    // 💡 [다중 조건 분기 추가] Else If 가상 노드
     const conditionElseIfTool: McpTool = {
       name: 'core__else_if',
       description: '앞선 조건들이 거짓(False)이고 현재 설정한 조건이 참(True)인 경우에만 하위 블록 노드들을 가동합니다.',
@@ -178,7 +193,6 @@ export default function AutomationView() {
       pluginId: 'AI_Core'
     };
 
-    // 💡 [다중 조건 분기 추가] End If 최종 블록 종결자 가상 노드
     const conditionEndIfTool: McpTool = {
       name: 'core__end_if',
       description: '열려 있는 조건 제어(If / Else If) 다중 분기 블록 영역을 닫고, 파이프라인의 일반 흐름을 다시 병합 재개시킵니다.',
@@ -983,7 +997,17 @@ export default function AutomationView() {
                       {filteredTools.map((tool) => (
                         <motion.div key={tool.name} draggable onDragStart={() => setDraggingTool(tool)} whileHover={{ x: 2 }} style={{ padding: '8px 10px', borderRadius: '8px', background: tool.name.startsWith('ai__') || tool.name.startsWith('core__') ? 'rgba(37,99,235,0.08)' : 'rgba(128,128,128,0.04)', border: '1px solid rgba(128,128,128,0.04)', cursor: 'grab', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                            {(tool.name.startsWith('ai__') || tool.name.startsWith('core__')) ? <Icon.Cpu /> : <Icon.Activity />}
+                            {tool.name === 'core__if_condition' ? (
+                              <Icon.BranchIf />
+                            ) : tool.name === 'core__else_if' ? (
+                              <Icon.BranchElseIf />
+                            ) : tool.name === 'core__end_if' ? (
+                              <Icon.BranchEndIf />
+                            ) : tool.name.startsWith('ai__') || tool.name.startsWith('core__') ? (
+                              <Icon.Cpu />
+                            ) : (
+                              <Icon.Activity />
+                            )}
                             <div style={{ fontSize: '0.78rem', fontWeight: 700, color: tool.name.startsWith('ai__') || tool.name.startsWith('core__') ? '#2563eb' : 'inherit' }}>{tool.name.includes('__') ? tool.name.split('__')[1] : tool.name}</div>
                           </div>
                           {tool.description && (
@@ -1111,12 +1135,15 @@ export default function AutomationView() {
                                       border: isStepRunning ? '1.5px solid #10b981'
                                         : isStepFailed ? '1.5px solid #ef4444'
                                         : isStepPassed ? '1px solid rgba(16, 185, 129, 0.4)'
+                                        : step.fullToolName === 'core__if_condition' ? '1px solid rgba(37,99,235,0.3)'
+                                        : step.fullToolName === 'core__else_if' ? '1px solid rgba(37,99,235,0.3)'
+                                        : step.fullToolName === 'core__end_if' ? '1px solid rgba(37,99,235,0.3)'
                                         : (step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? '1px solid rgba(37,99,235,0.3)' : 'var(--border-glass)', 
                                       borderRadius: '12px', padding: '10px 14px', cursor: 'grab', 
                                       boxShadow: isStepRunning ? '0 0 15px rgba(16, 185, 129, 0.15)'
                                         : isStepFailed ? '0 0 15px rgba(239, 68, 68, 0.15)' : '0 2px 8px rgba(0,0,0,0.02)', 
                                       flexShrink: 0,
-                                      zIndex: activeChipMenuId?.startsWith(step.id) ? 100 : 2,
+                                      zIndex: (activeChipMenuId?.startsWith(`${step.id}_left`) || activeChipMenuId?.startsWith(`${step.id}_right`) || activeChipMenuId?.startsWith(`${step.id}_val`)) ? 100 : 2,
                                       transition: 'border-color 0.3s ease, box-shadow 0.3s ease, gap 0.2s ease'
                                     }}
                                   >
@@ -1128,7 +1155,7 @@ export default function AutomationView() {
                                     )}
                                     
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isStepRunning ? '#10b981' : isStepFailed ? '#ef4444' : (step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? '#2563eb' : 'var(--color-text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: isStepRunning ? '#10b981' : isStepFailed ? '#ef4444' : step.fullToolName === 'core__if_condition' ? '#2563eb' : step.fullToolName === 'core__else_if' ? '#2563eb' : step.fullToolName === 'core__end_if' ? '#2563eb' : (step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? '#2563eb' : 'var(--color-text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         
                                         {isStepFailed ? (
                                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444', marginRight: '4px' }} />
@@ -1138,7 +1165,17 @@ export default function AutomationView() {
                                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', marginRight: '4px' }} />
                                         ) : null}
 
-                                        {(step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? <Icon.Cpu /> : <Icon.Activity />}
+                                        {step.fullToolName === 'core__if_condition' ? (
+                                          <Icon.BranchIf />
+                                        ) : step.fullToolName === 'core__else_if' ? (
+                                          <Icon.BranchElseIf />
+                                        ) : step.fullToolName === 'core__end_if' ? (
+                                          <Icon.BranchEndIf />
+                                        ) : (step.fullToolName.startsWith('ai__') || step.fullToolName.startsWith('core__')) ? (
+                                          <Icon.Cpu />
+                                        ) : (
+                                          <Icon.Activity />
+                                        )}
                                         [Node {index}] {step.fullToolName.includes('__') ? step.fullToolName.split('__')[1] : step.fullToolName}
                                         <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>({step.pluginId})</span>
                                       </div>
@@ -1249,24 +1286,50 @@ export default function AutomationView() {
                                                   </div>
                                                 </div>
                                               ) : (step.fullToolName === 'core__if_condition' || step.fullToolName === 'core__else_if') ? (
-                                                /* 2. 💡 [다중 분기 대응] IF 및 ELSE IF 노드 통합 빌더 레이아웃 마운트 */
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb' }}>
-                                                    {step.fullToolName === 'core__if_condition' ? '🛑 IF (최초 조건)' : '🌿 ELSE IF (추가 다중 조건)'}
-                                                  </div>
-                                                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.5fr', gap: '8px', alignItems: 'flex-end' }}>
-                                                    <div>
-                                                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Left Value</label>
-                                                      <input 
-                                                        type="text" 
-                                                        value={parsedArgs.left_value || ""} 
-                                                        onChange={e => handleStructuredFieldChange(step.id, step.argsTemplate, 'left_value', e.target.value)}
-                                                        placeholder="예: {{step_0.output}} 또는 {{variables.my_var}}"
-                                                        style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-modal)', color: 'inherit', fontSize: '0.74rem', boxSizing: 'border-box' }}
-                                                      />
+                                                /* 2. 💡 [바인딩 일원화 고도화] IF 및 ELSE IF 노드 양방향 칩 연동 지원 바인딩 컴포넌트 */
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                  
+                                                  {/* 좌측 대상 값 지정 유닛 스택 */}
+                                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', position: 'relative' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                      <label style={{ fontSize: '0.71rem', fontWeight: 700, color: 'var(--color-text-main)' }}>Left Value (비교 대상 값)</label>
+                                                      <div style={{ position: 'relative' }}>
+                                                        <button
+                                                          type="button"
+                                                          onClick={(e) => { e.stopPropagation(); setActiveChipMenuId(activeChipMenuId === `${step.id}_left` ? null : `${step.id}_left`); }}
+                                                          style={sharedChipBtnStyle('rgba(37,99,235,0.08)', '#2563eb')}
+                                                        >
+                                                          <Icon.Link /> 바인딩 선택
+                                                        </button>
+
+                                                        {activeChipMenuId === `${step.id}_left` && (
+                                                          <div ref={chipMenuRef} style={{ position: 'absolute', right: 0, top: '22px', backgroundColor: 'var(--bg-modal)', border: 'var(--border-glass)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', padding: '6px', zIndex: 1005, display: 'flex', flexDirection: 'column', gap: '4px', width: '220px', maxHeight: '180px', overflowY: 'auto' }}>
+                                                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderBottom: '1px solid rgba(128,128,128,0.1)', paddingBottom: '2px' }}>노드 결과 풀</div>
+                                                            {index > 0 ? (
+                                                              <button type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, 'left_value', `{{step_${index - 1}.output}}`); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: 'var(--color-text-main)', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>Node {index - 1} 결과 연동</button>
+                                                            ) : <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', padding: '2px 4px' }}>이전 단계 없음</span>}
+                                                            
+                                                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '4px', paddingBottom: '2px' }}>글로벌 가변 변수 연동</div>
+                                                            {variables.map(v => (
+                                                              <button key={v.key} type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, 'left_value', `{{variables.${v.key}}}`); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>{v.key} 호출</button>
+                                                            ))}
+                                                          </div>
+                                                        )}
+                                                      </div>
                                                     </div>
+                                                    <input 
+                                                      type="text" 
+                                                      value={parsedArgs.left_value || ""} 
+                                                      onChange={e => handleStructuredFieldChange(step.id, step.argsTemplate, 'left_value', e.target.value)}
+                                                      placeholder="직접 기입하거나 바인딩 선택 단추를 눌러 토큰 마커를 주입하세요."
+                                                      style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-modal)', color: 'inherit', fontSize: '0.74rem', boxSizing: 'border-box', outline: 'none' }}
+                                                    />
+                                                  </div>
+
+                                                  {/* 중단 연산자 매핑 셀렉터 및 우측 기준 값 컴포넌트 세트 배열 */}
+                                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.8fr', gap: '8px', alignItems: 'flex-end' }}>
                                                     <div>
-                                                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Operator</label>
+                                                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Operator (연산식)</label>
                                                       <select 
                                                         value={parsedArgs.operator || "equals"} 
                                                         onChange={e => handleStructuredFieldChange(step.id, step.argsTemplate, 'operator', e.target.value)}
@@ -1282,22 +1345,49 @@ export default function AutomationView() {
                                                         <option value="less_than_or_equal">&lt;= (작거나 같음)</option>
                                                       </select>
                                                     </div>
-                                                    <div>
-                                                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Right Value</label>
+
+                                                    {/* 💡 [우측 기준 값 명세 지정 유닛 스택 + 양방향 칩 바인딩 동시 추가] */}
+                                                    <div style={{ position: 'relative' }}>
+                                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                                                        <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)' }}>Right Value (비교 기준 값)</label>
+                                                        <div style={{ position: 'relative' }}>
+                                                          <button
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); setActiveChipMenuId(activeChipMenuId === `${step.id}_right` ? null : `${step.id}_right`); }}
+                                                            style={sharedChipBtnStyle('rgba(37,99,235,0.08)', '#2563eb')}
+                                                          >
+                                                            <Icon.Link /> 바인딩 선택
+                                                          </button>
+
+                                                          {activeChipMenuId === `${step.id}_right` && (
+                                                            <div ref={chipMenuRef} style={{ position: 'absolute', right: 0, top: '22px', backgroundColor: 'var(--bg-modal)', border: 'var(--border-glass)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', padding: '6px', zIndex: 1005, display: 'flex', flexDirection: 'column', gap: '4px', width: '220px', maxHeight: '180px', overflowY: 'auto' }}>
+                                                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderBottom: '1px solid rgba(128,128,128,0.1)', paddingBottom: '2px' }}>노드 결과 풀</div>
+                                                              {index > 0 ? (
+                                                                <button type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, 'right_value', `{{step_${index - 1}.output}}`); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: 'var(--color-text-main)', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>Node {index - 1} 결과 연동</button>
+                                                              ) : <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', padding: '2px 4px' }}>이전 단계 없음</span>}
+                                                              
+                                                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--color-text-muted)', borderTop: '1px solid rgba(128,128,128,0.1)', paddingTop: '4px', paddingBottom: '2px' }}>글로벌 가변 변수 연동</div>
+                                                              {variables.map(v => (
+                                                                <button key={v.key} type="button" onClick={() => { handleStructuredFieldChange(step.id, step.argsTemplate, 'right_value', `{{variables.${v.key}}}`); setActiveChipMenuId(null); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', fontSize: '0.68rem', padding: '5px', cursor: 'pointer', color: '#2563eb', fontWeight: 600, borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(128,128,128,0.06)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>{v.key} 호출</button>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      </div>
                                                       <input 
                                                         type="text" 
                                                         value={parsedArgs.right_value || ""} 
                                                         onChange={e => handleStructuredFieldChange(step.id, step.argsTemplate, 'right_value', e.target.value)}
-                                                        placeholder="예: 27 또는 성공"
-                                                        style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-modal)', color: 'inherit', fontSize: '0.74rem', boxSizing: 'border-box' }}
+                                                        placeholder="예: 성공 또는 27"
+                                                        style={{ width: '100%', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-glass-input)', background: 'var(--bg-modal)', color: 'inherit', fontSize: '0.74rem', boxSizing: 'border-box', outline: 'none' }}
                                                       />
                                                     </div>
                                                   </div>
                                                 </div>
                                               ) : step.fullToolName === 'core__end_if' ? (
                                                 /* 3. 💡 [다중 분기 대응] END IF 처리 마커 양식 마운트 */
-                                                <div style={{ fontSize: '0.72rem', color: '#2563eb', textAlign: 'center', padding: '6px', fontWeight: 600, background: 'rgba(37,99,235,0.04)', borderRadius: '6px' }}>
-                                                  🛑 이 지점부터 전체 다중 조건절 체인이 완전히 닫히고, 하위 노드들의 메인 스트림 흐름이 재개됩니다.
+                                                <div style={{ fontSize: '0.72rem', color: '#4b5563', textAlign: 'center', padding: '6px', fontWeight: 600, background: 'rgba(128,128,128,0.05)', borderRadius: '6px', border: '1px solid rgba(128,128,128,0.1)' }}>
+                                                  이 지점부터 전체 다중 조건절 체인이 완전히 닫히고, 하위 노드들의 메인 스트림 흐름이 재개됩니다.
                                                 </div>
                                               ) : (
                                                 /* 4. 일반 실물 플러그인 또는 ask_llm properties 입력 양식 루프 */
