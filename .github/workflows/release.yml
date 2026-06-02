@@ -13,6 +13,7 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: write
+      packages: write
 
     steps:
       - name: Checkout Repository
@@ -34,8 +35,21 @@ jobs:
       - name: Generate Application Icons
         run: npm run build-icon
 
-      - name: Build and Publish Electron App
-        run: npm run package
+      - name: Create GitHub Release Draft
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true       # ➔ 드래프트 상태로 안전하게 생성하여 검수 후 릴리스
+          prerelease: false
+          tag_name: ${{ github.ref_name }} # Push된 태그 이름 (e.g. v1.1.0) 자동 매핑
+          name: Release ${{ github.ref_name }}
+          body: |
+            Liminal Desktop 자동화 및 다중 분기 제어 엔진 안정화 릴리스 버전입니다.
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Publish Electron App
+        run: npm run package -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false

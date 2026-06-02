@@ -1,6 +1,6 @@
 {
   "name": "liminal-desktop",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "다중 LLM 엔진과 MCP 플러그인을 하나의 워크스페이스에서 운용하는 AI 데스크탑 클라이언트",
   "main": "dist/main/main.js",
   "type": "commonjs",
